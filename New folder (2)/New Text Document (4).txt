@@ -1,0 +1,116 @@
+20:17:17 Found Remote: ReplicatedStorage.Events.GetData 
+20:17:17 Found Remote: ReplicatedStorage. Events. Tutorial 
+20:17:17 Found Remote: ReplicatedStorage.Events.Shop 
+20:17:17 Found Remote: ReplicatedStorage, Events. Quest 
+20:17:17 20:17:17 Found Remote: ReplicatedStorage. Events. Bartel Rewards Found Remote: ReplicatedStorage. Events. Settings 
+20:17:17 Found Remote: ReplicatedStorage. Events. UpdateData 
+20:17:17 Found Remote: ReplicatedStorage. Events.Units 
+20:17:17 Found Remote: ReplicatedStorage. Events. Pod 
+20:17:17 Found Remote: ReplicatedStorage. Events.MusicSet 
+20:17:17 Found Remote: ReplicatedStorage.Events.Game 
+20:17:17 Found Remote: ReplicatedStorage. Events. Summon 
+20:17:17 Found Remote: ReplicatedStorage.Events. TeleportToSystem 
+20:17:17 Found Remote: ReplicatedStorage.Events.Powers 
+20:17:17 Found Remote: ReplicatedStorage.Events. SystemMessage 
+20:17:17 Found Remote: ReplicatedStorage.Events.Items Level 28 
+20:17:17 Found Remote: ReplicatedStorage.Events.StatReroll 
+20:17:17 Found Remote: ReplicatedStorage. Events.Mount 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.DataService.RF.IsPlayerDataReady 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages.Knit.Services. DataService.RF.onTestServerPassword Submitted 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.DataService.RF.GetOtherPlayerData 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages. Knit. Services. DataService.RF.listenOther 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. DataService.RF.disconnectOtherListener 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.DataService.RF.GetPlayerData 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.DataService.RF.GetOtherPlayers Data 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.DataService. RE. DataReady 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages.Knit.Services.DataService.RE.ListenedOther 
+20:17:17 Found Remote: ReplicatedStorage, Modules.Packages.Knit.Services.DataService. RE. DataChanged 
+20:17:17 Found Remote: ReplicatedStorage, Modules.Packages. Knit.Services.CoreService.RF.EquipTitle 
+Found Remote: ReplicatedStorage. Modules. Packages. Knit.Services.CoreService.RF.EquipAura Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.CoreService.RF.EquipStance 20:17:17 
+20:17:17 
+20:17:17 Found Remote: ReplicatedStorage. Modules. Packages.Knit.Services.CoreService.RE. LimitedStarterPack 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages.Knit.Services.CoreService.RE.ShowItem 
+20:17:17 20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.CoreService.RE.Dialog Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. LeaderboardService.RE.UpdateLeaderboard 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages. Knit.Services.PartyService.RF.LeaveParty 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.PartyService.RF.AcceptInvite 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages. Knit.Services, PartyService. RF.InvitePlayer 
+20:17:17 Found Remote: ReplicatedStorage, Modules. Packages.Knit.Services.PartyService.RF.CreateParty 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.PartyService.RE.PlayerLeftParty 
+20:17:17 Found Remote: ReplicatedStorage. Modules. Packages. Knit.Services.PartyService.RE.CreateInviteFrame 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages. Knit.Services PartyService. RE, Update PartyList 
+20:17:17 Found Remote: ReplicatedStorage. Modules.Packages.Knit.Services, AFKService.RE.UpdatePlayer 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages. Knit.Services. UnitService. RF. RollStats 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages. Knit.Services.UnitService.RF.AddLock ToUnit 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. UnitService.RF. EquipSkin 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.UnitService.RF.LoadTeam 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages. Knit.Services. UnitService.RF.RollTrait 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.UnitService.RF.EvolveUnit 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. UnitService. RF.RemoveLockFromUnit 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages.Knit.Services. UnitService.RF.SaveTeam 
+20:17:17 Found Remote: ReplicatedStorage. Modules. Packages.Knit.Services. UnitService.RF.UseSkinItem 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.UnitService.RE.LockBroke 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. UnitService.RE.Rolled Power 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages. Knit.Services. SummonService.RF.Summon 20:17:17 Found Remote: ReplicatedStorage. Modules. Packages. Knit.Services. SummonService. RF.GetBanner 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. SummonService. RF.UseKey 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. SummonService. RF.SetBannerPity 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages.Knit.Services. SummonService.RE.RefreshBanners 
+20:17:17 Found Remote: ReplicatedStorage. Modules. Packages. Knit. Services. SummonService.RE. Summoned 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages. Knit.Services.QuestService.RE.CompleteNotification 
+20:17:17 Found Remote: ReplicatedStorage. Modules. Packages.Knit.Services.QuestService.RE.RefreshMissionQuest 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages. Knit.Services.QuestService.RE.UpdateContracts 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages. Knit.Services.QuestService. RF. StartContract 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages/Knit.Services.QuestService. RF.RequestClaimQuestAll 
+Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.QuestService.RF.StartQuest 
+20:17:17 20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.QuestService.RF.RequestClaimQuest 
+20:17:17 Found Remote: ReplicatedStorage. Modules. Packages. Knit, Services. ItemService.RF.UseItem 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages. Knit.Services. ItemService.RF.FavoriteItem 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. ItemService. RF.OpenBox 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.ItemService.RF. OpenCapsule 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages. Knit.Services.ItemService.RF.UsePortal 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. ItemService.RE.OpenedBox 20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.PlayerService.RF.ClaimIndexRewards 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages.Knit.Services.PlayerService.RF.ClaimLikeGroupReward 
+20:17:17 Found Remote: ReplicatedStorage. Modules. Packages. Knit. Services.PlayerService. RF.GetDaily Rewards 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages. Knit.Services.PlayerService.RF.ClaimLevelReward 
+20:17:17 Found Remote: ReplicatedStorage. Modules. Packages.Knit.Services.PlayerService.RF.GetLevelRewards 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages. Knit.Services.PlayerService.RF.ClaimDailyReward 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages. Knit.Services.PlayerService. RF.ClaimBattlepass 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.PlayerService.RF.ClaimMilestone 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages.Knit.Services. PlayerService.RF.EquipEmote 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages.Knit.Services. PlayerService. RF.DuelEmote 
+20:17:17 20:17:17 Found Remote: ReplicatedStorage. Modules. Packages.Knit.Services.PlayerService. RF.PlayEmote Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.PlayerService.RF.GetBattlepassRewards 
+20:17:17 Found Remote: ReplicatedStorage. Modules.Packages.Knit.Services.PlayerService.RF.ClaimAdventCalendar 
+20:17:17 Found Remote: ReplicatedStorage.Modules. Packages.Knit.Services.PlayerService.RE. ShowUpdateLog 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages. Knit. Services.PlayerService.RE. DisableMovement 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.StoreService. RF.ClaimFreeUpdate10Bundle 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.StoreService.RF.GiftProduct 
+20:17:17 Found Remote: ReplicatedStorage. Modules.Packages.Knit.Services. StoreService.RF.PurchaseDevproduct 20:17:17 Found Remote: ReplicatedStorage. Modules.Packages.Knit.Services. TierService.RF.ConvertUnits 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services. TeleportService.RE. PromptTeleportUI 
+20-17-17 Found Remote. RenlicatedStorage Modules Parkages Knit Modules Parkages Knit Servires Craftinoservice RF CraftItem
+20:17:17 
+Found Remote: ReplicatedStorage.Modules.Packages. Knit.Services.PodService.RE.TogglePortal 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.PodService.RE.ToggleRift 
+20:17:17 Found Remote: ReplicatedStorage.Modules.Packages.Knit.Services.PodService.RE.ShowPortal 
+20:17:17 20:17:17 Found Remote: ReplicatedStorage. Modules.Packages.Knit.Services. EventService.RF.OnEggPickup Found Remote: ReplicatedStorage. Modules.Packages. Knit.Services.EventService. RE. UpdateEggLocations 
+20:17:17 Found Remote: ReplicatedStorage.PostieSent 
+20:17:17 Found Remote: ReplicatedStorage. PostieReceived 
+20:17:17 Found Remote: ReplicatedStorage.GameAnalyticsRemoteConfigs 
+20:17:17 Found Remote: ReplicatedStorage. GameAnalyticsError 
+20:17:17 Found Remote: Workspace. Players.2a2n2a2I.Animate.Override 
+20:17:17 Found Remote: Workspace. Players.iam99yearyold.Animate. Override 
+20:17:17 Found Remote: Workspace. Players.yragan3931.Animate.Override 
+20:17:17 Found Remote: Workspace.Players.mxsthate_Trey. Animate. Override 
+20:17:17 Found Remote: Workspace.Players.fartsmella1620.Animate. Override 
+20:17:17 Found Remote: Workspace. Players. BonnyliliyeBff.Animate.Override 
+20:17:17 Found Remote: Workspace.Players.epicfinley318.Animate. Override 
+146,814 
+20:17:17 Found Remote: Workspace.Players.25kswsx.Animate.Override 
+20:17:17 Found Remote: Workspace. Players.whoisreflect.Animate.Override 
+20:17:17 Found Remote: Workspace. Players.iefudfusiri.Animate.Override Lv 
+21 
+Lv 40 required! 
+20:17:17 Found Remote: Workspace. Players.Mikkelhunderup.Animate. Override 
+20:17:17 Found Remote: Workspace. Players. NemoToHej. Animate.Override 
+20:17:17 -Found Remote: Workspace. Players.kolos3328.Animate.Override 
+20:17:17 Found Remote: Workspace.Players.kuba13524.Animate.Override 
+¥600 
+20:17:17 Scan complete!

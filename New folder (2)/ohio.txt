@@ -1,0 +1,924 @@
+local vu = game:GetService("VirtualUser")
+game:GetService("Players").LocalPlayer.Idled:Connect(function()
+   vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+   wait(3)
+   vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+
+
+local MacLib = loadstring(game:HttpGet("https://github.com/biggaboy212/Maclib/releases/latest/download/maclib.txt"))()
+
+local Window = MacLib:Window({
+	Title = "NaN Project",
+	Subtitle = "Anime Guardians",
+	Size = UDim2.fromOffset(868, 650),
+	DragStyle = 1,
+	DisabledWindowControls = {},
+	ShowUserInfo = false,
+	Keybind = Enum.KeyCode.RightControl,
+	AcrylicBlur = true,
+})
+
+local globalSettings = {
+	UIBlurToggle = Window:GlobalSetting({
+		Name = "UI Blur",
+		Default = Window:GetAcrylicBlurState(),
+		Callback = function(bool)
+			Window:SetAcrylicBlurState(bool)
+			Window:Notify({
+				Title = Window.Settings.Title,
+				Description = (bool and "Enabled" or "Disabled") .. " UI Blur",
+				Lifetime = 5
+			})
+		end,
+	}),
+	NotificationToggler = Window:GlobalSetting({
+		Name = "Notifications",
+		Default = Window:GetNotificationsState(),
+		Callback = function(bool)
+			Window:SetNotificationsState(bool)
+			Window:Notify({
+				Title = Window.Settings.Title,
+				Description = (bool and "Enabled" or "Disabled") .. " Notifications",
+				Lifetime = 5
+			})
+		end,
+	}),
+	ShowUserInfo = Window:GlobalSetting({
+		Name = "Show User Info",
+		Default = Window:GetUserInfoState(),
+		Callback = function(bool)
+			Window:SetUserInfoState(bool)
+			Window:Notify({
+				Title = Window.Settings.Title,
+				Description = (bool and "Showing" or "Redacted") .. " User Info",
+				Lifetime = 5
+			})
+		end,
+	})
+}
+
+local tabGroups = {
+	TabGroup1 = Window:TabGroup()
+}
+
+local tabs = {
+	Main = tabGroups.TabGroup1:Tab({ Name = "Main", Image = "rbxassetid://18821914323" }),
+	Macro = tabGroups.TabGroup1:Tab({ Name = "Macro", Image = "rbxassetid://18821914323" }),
+	Settings = tabGroups.TabGroup1:Tab({ Name = "Settings", Image = "rbxassetid://10734950309" })
+}
+
+local sections = {
+	MainSection1 = tabs.Main:Section({ Side = "Left" }),
+	MainSection2 = tabs.Main:Section({ Side = "Right" }),
+	MainSection3 = tabs.Main:Section({ Side = "Left" }),
+	Lab = tabs.Main:Section({ Side = "Left" }),
+}
+
+sections.MainSection1:Header({
+	Name = "Portals"
+})
+
+
+local Dropdown = sections.MainSection1:Dropdown({
+	Name = "Select Type Portal:",
+	Multi = false,
+	Required = true,
+	Options = {"Story","Raid","Challenge","Tower Adventures","Event [Mitsuki]"},
+	Default = "",
+	Callback = function(Value)
+		getgenv().TypePortal = Value 
+	end,
+}, "PortalSelect")
+
+sections.MainSection1:Toggle({
+	Name = "Create Config Type Portal",
+	Default = false,
+	Callback = function(value)
+
+		getgenv().CreatePortal = value 
+		 while task.wait(1) do 
+			 if CreatePortal == true then 
+
+				if getgenv().TypePortal == "Story" then 
+				local args = {
+                    [1] = "Story",
+                    [2] = {
+                        [1] = getgenv().WorldSelect,
+                        [2] =  getgenv().ActSelect,
+                        [3] =  getgenv().DifficultySelect
+                    }
+                }
+                
+                game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("CreatingPortal"):InvokeServer(unpack(args))
+                
+                task.wait(1)
+
+          if game:GetService("Players").LocalPlayer.PlayerGui.Main:WaitForChild("PortalRoom").Visible == true  then 
+             task.wait(.5)
+                local args = {
+                    [1] = "Create",
+                    [2] = {
+                        [1] = getgenv().WorldSelect,
+                        [2] =  getgenv().ActSelect,
+                        [3] =  getgenv().DifficultySelect
+                    }
+                }
+                
+                game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("CreatingPortal"):InvokeServer(unpack(args))
+            
+            end 
+		elseif getgenv().TypePortal == "Challenge" then 
+			local args = {
+				[1] = "Challenge",
+				[2] = {}
+			}
+			
+			game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("CreatingPortal"):InvokeServer(unpack(args))
+
+			if game:GetService("Players").LocalPlayer.PlayerGui.Main:WaitForChild("PortalRoom").Visible == true  then 
+				task.wait(.5)
+				   local args = {
+					   [1] = "Create",
+					   [2] = {
+						   [1] = getgenv().WorldSelectRaid,
+						   [2] =  getgenv().ActSelectRaid,
+						   [3] =  "Challenge"
+					   }
+				   }
+				   
+				   game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("CreatingPortal"):InvokeServer(unpack(args))
+				end 
+
+				
+		elseif getgenv().TypePortal == "Raid" then 
+local args = {
+    [1] = "Raid",
+    [2] = {
+        [1] = getgenv().WorldSelectRaid,
+        [2] =  getgenv().ActSelectRaid,
+        [3] =  "Raid"
+    }
+}
+
+game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("CreatingPortal"):InvokeServer(unpack(args))
+
+if game:GetService("Players").LocalPlayer.PlayerGui.Main:WaitForChild("PortalRoom").Visible == true  then 
+	task.wait(.5)
+	   local args = {
+		   [1] = "Create",
+		   [2] = {
+			   [1] = getgenv().WorldSelectRaid,
+			   [2] =  getgenv().ActSelectRaid,
+			   [3] =  "Raid"
+		   }
+	   }
+	   
+	   game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("CreatingPortal"):InvokeServer(unpack(args))
+	end 
+
+	elseif getgenv().TypePortal == "Tower Adventures" then 
+	   getgenv().Number = ""
+	   for i,v in pairs(game:GetService("Players").LocalPlayer.Stages["Cursed Place"]:GetDescendants()) do 
+		if v:IsA("StringValue") and v.Value == "noclear" then 
+		 print(v.Parent.Name)
+		 getgenv().Number = v.Parent.Name
+		 end 
+		 end
+ task.wait(.5)
+		 local args = {
+			[1] = "Tower Adventures",
+			[2] = {
+				[1] = "Cursed Place",
+				[2] =  getgenv().Number,
+				[3] = "Tower Adventures"
+			}
+		}
+		
+		game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("CreatingPortal"):InvokeServer(unpack(args))
+		
+		if game:GetService("Players").LocalPlayer.PlayerGui.Main:WaitForChild("PortalRoom").Visible == true  then 
+			task.wait(.5)
+			   local args = {
+				   [1] = "Create",
+				   [2] = {
+					   [1] ="Cursed Place",
+					   [2] =  getgenv().Number,
+					   [3] =  "Tower Adventures"
+				   }
+			   }
+			   
+			   game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("CreatingPortal"):InvokeServer(unpack(args))
+			end 
+		elseif  getgenv().TypePortal == "Event [Mitsuki]" then 
+
+		local args = {
+			[1] = "Create_Solo",
+			[2] = {
+				[1] = "The Forest",
+				[2] = "1",
+				[3] = "Event"
+			}
+		}
+		
+		game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("CreatingPortal"):InvokeServer(unpack(args))	
+			
+		end 
+
+
+		else
+			wait()
+			break
+		end 
+	end 
+
+	end,
+}, "CreatePortal")
+
+sections.MainSection2:Header({
+	Name = "Story Configs:"
+})
+
+local Dropdown = sections.MainSection2:Dropdown({
+	Name = "World:",
+	Multi = false,
+	Required = true,
+	Options = {"Large Village", "Holllow Land", "Monster City", "Academy Demon"},
+	Default = "",
+	Callback = function(Value)
+		getgenv().WorldSelect = Value 
+	end,
+}, "SelectWorldStory")
+
+local Dropdown = sections.MainSection2:Dropdown({
+	Name = "Act:",
+	Multi = false,
+	Required = true,
+	Options = {"1","2","3","4","5","6"},
+	Default = "",
+	Callback = function(Value)
+	getgenv().ActSelect =Value 
+	end,
+}, "SelectActStory")
+
+local Dropdown = sections.MainSection2:Dropdown({
+	Name = "Difficulty:",
+	Multi = false,
+	Required = true,
+	Options = {"Normal","Nightmare"},
+	Default = "",
+	Callback = function(Value)
+	getgenv().DifficultySelect =Value 
+	end,
+}, "SelectDifficultyStory")
+
+-- RAID 
+sections.MainSection2:Header({
+	Name = "Raid Configs:"
+})
+
+local Dropdown = sections.MainSection2:Dropdown({
+	Name = "World:",
+	Multi = false,
+	Required = true,
+	Options = {"Lawless City", "Temple"},
+	Default = "",
+	Callback = function(Value)
+		getgenv().WorldSelectRaid = Value 
+	end,
+}, "SelectWorldRaid")
+
+local Dropdown = sections.MainSection2:Dropdown({
+	Name = "Act:",
+	Multi = false,
+	Required = true,
+	Options = {"1","2","3","4","5","6"},
+	Default = "",
+	Callback = function(Value)
+	getgenv().ActSelectRaid =Value 
+	end,
+}, "SelectActRaid")
+
+
+sections.MainSection2:Divider()
+
+sections.MainSection2:Header({
+	Text = "Challenge & Tower Adventures Configs"
+})
+sections.MainSection2:Label({
+	Text = "Challenge: Auto Create + Start When You Select \n\n Tower Adventures: Auto Create + Start Highest Unclear Room."
+})
+
+
+sections.MainSection3:Header({
+	Name = "In-Match Configs:"
+})
+
+local Dropdown = sections.MainSection3:Dropdown({
+	Name = "Select Card: ",
+	Multi = false,
+	Required = true,
+	Options = {"Fast Wave","Normal"},
+	Default = "Fast Wave",
+	Callback = function(Value)
+		getgenv().Card = Value 
+	end,
+}, "CardSelect")
+
+
+sections.MainSection3:Toggle({
+	Name = "Auto Select Card",
+	Default = false,
+	Callback = function(value)
+		getgenv().AutoSelectCard = value
+        while task.wait(.5) do 
+			 if AutoSelectCard == true then 
+		 
+				if game:GetService("Players").LocalPlayer.PlayerGui.StagesChallenge.Enabled == true then 
+
+					local args = {
+						[1] = getgenv().Card 
+					}
+					
+					game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("StageChallenge"):InvokeServer(unpack(args))
+
+					
+				end 
+
+			 else
+				wait()
+				break
+			 end 
+			end 
+	end,
+}, "AutoSelectCardToggle")
+
+
+
+local Dropdown = sections.MainSection3:Dropdown({
+	Name = "Select What To Do After Win/Lose: ",
+	Multi = false,
+	Required = true,
+	Options = {"Retry","Return To Lobby"},
+	Default = "Fast Wave",
+	Callback = function(Value)
+		getgenv().Method = Value 
+	end,
+}, "Method")
+
+sections.MainSection3:Toggle({
+	Name = "Auto Do Selected After Win/Lose",
+	Default = false,
+	Callback = function(value)
+		getgenv().AutoAfterWinLose = value
+        while task.wait(.5) do 
+			 if AutoAfterWinLose == true then 
+		 
+				if getgenv().Method == "Retry" then 
+
+					local Player = game.Players.LocalPlayer
+					local vim = game:GetService("VirtualInputManager")
+					local inset1, inset2 = game:GetService('GuiService'):GetGuiInset()
+					local insetOffset = inset1 - inset2
+					
+					
+					if game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("ViewGUI") then 
+					local part =game:GetService("Players").LocalPlayer.PlayerGui.ViewGUI.Frame.IntereactButton
+					
+					part.BackgroundTransparency  = 1
+						  local topLeft = part.AbsolutePosition + insetOffset
+						  local center = topLeft + (part.AbsoluteSize/2)
+						  local X = center.X + 30
+						  local Y = center.Y
+							vim:SendMouseButtonEvent(X, Y, 0, true, game, 0)
+							task.wait()
+							vim:SendMouseButtonEvent(X, Y, 0, false, game, 0)
+					end 
+					
+							if game:GetService("Players").LocalPlayer.PlayerGui.EndGUI.Enabled == true then 
+						local args = {
+							[1] = "RetryVote"
+						}
+						
+						game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("Control"):InvokeServer(unpack(args))
+						
+					end 
+					
+				
+
+					
+				elseif getgenv().Method ==   "Return To Lobby" then 
+					
+					local Player = game.Players.LocalPlayer
+					local vim = game:GetService("VirtualInputManager")
+					local inset1, inset2 = game:GetService('GuiService'):GetGuiInset()
+					local insetOffset = inset1 - inset2
+					
+					
+					if game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("ViewGUI") then 
+					local part =game:GetService("Players").LocalPlayer.PlayerGui.ViewGUI.Frame.IntereactButton
+					
+					part.BackgroundTransparency  = 1
+						  local topLeft = part.AbsolutePosition + insetOffset
+						  local center = topLeft + (part.AbsoluteSize/2)
+						  local X = center.X + 30
+						  local Y = center.Y
+							vim:SendMouseButtonEvent(X, Y, 0, true, game, 0)
+							task.wait()
+							vim:SendMouseButtonEvent(X, Y, 0, false, game, 0)
+					end 
+					
+					if game:GetService("Players").LocalPlayer.PlayerGui.EndGUI.Enabled == true then 
+					local gameId = "17282336195"
+					
+					local function teleportToGame()
+						local TeleportService = game:GetService("TeleportService")
+						local player = game.Players.LocalPlayer 
+					   
+						TeleportService:Teleport(tonumber(gameId), player)
+					end
+					
+					teleportToGame()
+				end 
+					
+				end 
+
+			 else
+				wait()
+				break
+			 end 
+			end 
+	end,
+}, "AutoAfterWinLoseToggle")
+
+sections.MainSection3:Toggle({
+	Name = "Auto Skip Wave",
+	Default = false,
+	Callback = function(value)
+		getgenv().AutoSkipWave = value
+        while task.wait(.5) do 
+			 if AutoSkipWave == true then 
+		 
+				if game:GetService("Players").LocalPlayer.Settings["Skip Wave"].Value == "OFF" then 
+
+					local args = {
+						[1] = "Skip Wave"
+					}
+					
+					game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("Settings"):InvokeServer(unpack(args))
+					
+					
+				end 
+
+			 else
+				wait()
+				break
+			 end 
+			end 
+	end,
+}, "AutoSkipWaveToggle")
+
+
+sections.MainSection3:Toggle({
+	Name = "Auto Vote Start",
+	Default = false,
+	Callback = function(value)
+		getgenv().AutoVoteStart = value
+        while task.wait(.5) do 
+			 if AutoVoteStart == true then 
+		 
+				if game:GetService("Players").LocalPlayer.PlayerGui.GUI.SkipwaveFrame.Visible  == true then 
+
+					local args = {
+						[1] = "Vote1"
+					}
+					
+					game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("Vote"):InvokeServer(unpack(args))
+					
+					
+				end 
+
+			 else
+				wait()
+				break
+			 end 
+			end 
+	end,
+}, "AutoVoteStartToggle")
+
+
+
+sections.MainSection3:Toggle({
+	Name = "Auto Remove Enemies [Visual]",
+	Default = false,
+	Callback = function(value)
+		getgenv().AutoRemoveEnemies = value
+        while task.wait(.5) do 
+			 if AutoRemoveEnemies == true then 
+		 
+				for i,v in pairs(workspace.Ground.enemyServer:GetChildren()) do 
+					v:Destroy()
+					end 
+
+			 else
+				wait()
+				break
+			 end 
+			end 
+	end,
+}, "AutoRemoveEnemiesToggle")
+
+
+sections.Lab:Header({
+	Name = "Lab Configs:"
+})
+
+
+sections.Lab:Label({
+	Text = "LOCK units you don't want to fuse, else it's gonna fuse all of ur selected units."
+})
+
+sections.Lab:Divider()
+
+local units = {} 
+ for i,v in pairs(game:GetService("ReplicatedStorage").PlayMode.Modules.UnitsSettings:GetChildren()) do 
+	 table.insert(units,v.Name)
+ end 
+
+
+
+sections.Lab:Dropdown({
+	Name = "Select Units:",
+	Search = true,
+	Multi = true,
+	Required = false,
+	Options = units,
+	Default = {"None"},
+	Callback = function(Value)
+		getgenv().ActualNameToSnipe = {}
+		for _, State in next, Value do
+			if State then
+				table.insert(getgenv().ActualNameToSnipe, _)
+			end
+		end
+
+	
+
+		print("Selected Unit:", table.concat(getgenv().ActualNameToSnipe, ", "))
+	end,
+}, "LabUnitFuse")
+
+
+sections.Lab:Toggle({
+	Name = "Auto Fuse Selected Units",
+	Default = false,
+	Callback = function(value)
+		 getgenv().Fuse = value 
+		  while task.wait(.1) do 
+			 if Fuse ==true then 
+
+
+				for i, v in pairs(game:GetService("Players").LocalPlayer.UnitsInventory:GetChildren()) do
+					if v:IsA("Folder") and v:FindFirstChild("Unit") and v:FindFirstChild("Locked") then
+						-- Check if v.Unit.Value is in the ActualNameToSnipe table
+						local unitName = v.Unit.Value
+						local isInList = false
+						
+						for _, name in ipairs(getgenv().ActualNameToSnipe) do
+							if unitName == name then
+								isInList = true
+								break
+							end
+						end
+						
+						-- Check if the unit should be sold
+						if isInList and v.Locked.Value == "no" then
+							local args = {
+								[1] = "Labsell",
+								[2] = {
+									[1] = v.Name
+								}
+							}
+							
+							game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("Manage"):InvokeServer(unpack(args))
+							
+							print("Fused unit:", unitName)
+						end
+					end
+				end
+				
+
+			 else 
+				 wait()
+				 break 
+			 end 
+			end 
+
+	end,
+}, "FuseUnitToggle")
+
+
+local sections = {
+	MainSection5 = tabs.Macro:Section({ Side = "Left" }),
+	MainSection6 = tabs.Macro:Section({ Side = "Right" }),
+}
+
+sections.MainSection5:Header({
+	Name = "Macro Info [Replay]:"
+})
+
+local MoneyUsed = sections.MainSection5:Label({
+	Text = "Money Used: 0$"
+})
+
+local UnitPlaced = sections.MainSection5:Label({
+	Text = "Unit Placed: ?"
+})
+
+local UnitUpgraded = sections.MainSection5:Label({
+	Text = "Unit Upgraded: ?"
+})
+
+local UnitSold = sections.MainSection5:Label({
+	Text = "Unit Sold: ?"
+})
+
+local currentMacros = {}
+for _, v in pairs(listfiles("./")) do
+	local matchedFile = string.match(v, "(.+%.txt)") -- Ensure the file ends with .txt
+	if matchedFile then
+		table.insert(currentMacros, matchedFile) -- Store the full file path
+	end
+end
+
+local macrofile = sections.MainSection6:Dropdown({
+	Name = "Select Macro:",
+	Multi = false,
+	Required = true,
+	Options = currentMacros,
+	Default = 1,
+	Callback = function(Value)
+		getgenv().SelectedMacro = Value
+	end,
+}, "SelectMacro")
+
+sections.MainSection6:Input({
+	Name = "Enter Macro Name:",
+	Placeholder = "",
+	AcceptedCharacters = "All",
+	Callback = function(input)
+		  getgenv().MacroName = input .. ".txt"
+	end,
+	onChanged = function(input)
+	  getgenv().MacroName = input .. ".txt"
+	end,
+}, "MacroName")
+
+sections.MainSection6:Button({
+	Name = "Create Entered Macro Name",
+	Callback = function()
+		writefile(getgenv().MacroName, "Created By Kazoun.")
+		macrofile:ClearOptions()
+		task.wait(.5)
+
+		local currentMacros = {}
+for _, v in pairs(listfiles("./")) do
+	local matchedFile = string.match(v, "(.+%.txt)") -- Ensure the file ends with .txt
+	if matchedFile then
+		table.insert(currentMacros, matchedFile) -- Store the full file path
+	end
+end
+macrofile:InsertOptions(currentMacros)
+
+	end,
+})
+
+sections.MainSection6:Button({
+	Name = "Delete Selected Macro",
+	Callback = function()
+		delfile(getgenv().SelectedMacro, "Created By Kazoun.")
+		macrofile:ClearOptions()
+		task.wait(.5)
+
+		local currentMacros = {}
+for _, v in pairs(listfiles("./")) do
+	local matchedFile = string.match(v, "(.+%.txt)") -- Ensure the file ends with .txt
+	if matchedFile then
+		table.insert(currentMacros, matchedFile) -- Store the full file path
+	end
+end
+macrofile:InsertOptions(currentMacros)
+	end,
+})
+
+
+sections.MainSection6:Divider()
+
+sections.MainSection6:Toggle({
+	Name = "Record Macro",
+	Default = false,
+	Callback = function(state)
+	  if state then 
+		repeat wait() until game:IsLoaded() 
+
+		if game:GetService("Players").LocalPlayer.PlayerGui.GUI.SkipwaveFrame.Visible  == true then 
+
+			local args = {
+				[1] = "Vote1"
+			}
+			
+			game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("Vote"):InvokeServer(unpack(args))
+			
+			
+		end 
+		
+		
+		local startTime = tick()
+		local towerRecord = {}
+		local httpService = game:GetService("HttpService")
+		local mt = getrawmetatable(game)
+		local oldNamecall = mt.__namecall
+		setreadonly(mt, false)
+		mt.__namecall = newcclosure(function(self, ...)
+			args = {...}
+			if getnamecallmethod() == "InvokeServer" and tostring(self) == "spawnunit" then
+				local unit = args[1][1]
+				local origin = args[1][2]
+				towerRecord[#towerRecord + 1] = {
+					["time"] = tick() - startTime; 
+					["moneyreq"] = tostring(game.Players.LocalPlayer.GameData.Yen.Value);
+					["character"] = args[1][1]; 
+					["position"] = origin and tostring(origin) or "Origin is missing";
+					["id"] = args[2];
+					["type"] = "CreateUnit";
+				}        
+			elseif getnamecallmethod() == "InvokeServer" and tostring(self) == "ManageUnits" then
+				if args[1] == "Upgrade" then
+					towerRecord[#towerRecord + 1] = {
+						["time"] = tick() - startTime, 
+						["moneyreq"] = tostring(game.Players.LocalPlayer.GameData.Yen.Value),
+						["character"] = args[2], 
+						["type"] = "UpgradeUnit"
+					}
+				elseif args[1] == "Selling" then
+					towerRecord[#towerRecord + 1] = {
+						["time"] = tick() - startTime, 
+						["moneyreq"] = tostring(game.Players.LocalPlayer.GameData.Yen.Value),
+						["character"] = args[2], 
+						["type"] = "SellUnit"
+					}
+				end     
+			end
+		
+			
+			return oldNamecall(self, unpack(args))
+		end)
+		setreadonly(mt, true)
+		
+		spawn(function()
+		   
+			while task.wait() do 
+					writefile(getgenv().SelectedMacro, httpService:JSONEncode(towerRecord))
+			end
+		end)
+		
+	  end 
+	end,
+}, "RecordMacroToggle")
+
+local Replay = sections.MainSection6:Toggle({
+	Name = "Replay Macro",
+	Default = false,
+	Callback = function(state)
+	if state then 
+		local replayName =  getgenv().SelectedMacro
+		local startTime = tick()
+		local macro = readfile(replayName)
+		local httpService = game:GetService("HttpService")
+		local recordTowers = httpService:JSONDecode(macro)
+		
+		local function stcf(s)
+			return loadstring("return CFrame.new(" .. s .. ");")()
+		end
+		
+		local function waitForMoney(requiredAmount)
+			local maxWaitTime = 5
+			local start = tick()
+			while tonumber(game.Players.LocalPlayer.GameData.Yen.Value) < tonumber(requiredAmount) do
+				if tick() - start > maxWaitTime then
+					warn("Timeout waiting for enough money!")
+					return false
+				end
+				task.wait(0.2)
+			end
+			return true
+		end
+		
+		local function place(info)
+			if not waitForMoney(info.moneyreq) then return end
+		
+			local args = {
+				[1] = {
+					[1] = info.character,
+					[2] = stcf(info.position),
+					[3] = 0
+				},
+				[2] = info.id
+			}
+			
+			local success, err = pcall(function()
+				game:GetService("ReplicatedStorage").PlayMode.Events.spawnunit:InvokeServer(unpack(args))
+			end)
+			
+			if success then
+				print("Placed " .. info.character)
+				MoneyUsed:UpdateName("Money Used: " .. info.moneyreq .. " $")
+				UnitPlaced:UpdateName("Unit Placed: " .. info.character)
+			else
+				warn("Failed to place " .. info.character .. ": " .. tostring(err))
+			end
+		
+			task.wait(0.2) -- Prevent skipping
+		end
+		
+		local function upgrade(info)
+			if not waitForMoney(info.moneyreq) then return end
+		
+			local args = {
+				[1] = "Upgrade",
+				[2] = info.character
+			}
+		
+			local success, err = pcall(function()
+				game:GetService("ReplicatedStorage").PlayMode.Events.ManageUnits:InvokeServer(unpack(args))
+			end)
+			
+			if success then
+				print("Upgraded " .. info.character)
+				MoneyUsed:UpdateName("Money Used: " .. info.moneyreq .. " $")
+		UnitUpgraded:UpdateName("Unit Upgraded: " .. info.character)
+			else
+				warn("Failed to upgrade " .. info.character .. ": " .. tostring(err))
+			end
+		
+			task.wait(0.2)
+		end
+		
+		local function sell(info)
+			if not waitForMoney(info.moneyreq) then return end
+		
+			local args = {
+				[1] = "Selling",
+				[2] = info.character
+			}
+		
+			local success, err = pcall(function()
+				game:GetService("ReplicatedStorage").PlayMode.Events.ManageUnits:InvokeServer(unpack(args))
+			end)
+		
+			if success then
+				print("Sold " .. info.character)
+				MoneyUsed:UpdateName("Money Used: " .. info.moneyreq .. " $")
+		UnitSold:UpdateName("Unit Sold: " .. info.character)
+			else
+				warn("Failed to sell " .. info.character .. ": " .. tostring(err))
+			end
+		
+			task.wait(0.2)
+		end
+		
+		local tower = 1
+		spawn(function()
+			while task.wait() do
+				if not recordTowers[tower] then break end
+		
+				local currentTask = recordTowers[tower]
+				if tonumber(currentTask.moneyreq) <= tonumber(game.Players.LocalPlayer.GameData.Yen.Value) then
+					if currentTask.type == "CreateUnit" then 
+						place(currentTask)
+					elseif currentTask.type == "UpgradeUnit" then 
+						upgrade(currentTask)
+					elseif currentTask.type == "SellUnit" then 
+						sell(currentTask)
+					end
+					recordTowers[tower] = nil
+					tower = tower + 1
+				end
+			end
+		end)
+	end 
+	end,
+}, "ReplayMacroToggle")
+
+
+
+MacLib:SetFolder("Maclib")
+tabs.Settings:InsertConfigSection("Left")
+
+Window.onUnloaded(function()
+	print("Unloaded!")
+end)
+
+tabs.Main:Select()
+MacLib:LoadAutoLoadConfig()
+

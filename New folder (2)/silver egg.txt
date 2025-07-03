@@ -1,0 +1,6 @@
+local args = {
+    [1] = "3083#Item",
+    [2] = math.huge
+}
+
+game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("ItemService"):WaitForChild("RF"):WaitForChild("OpenCapsule"):InvokeServer(unpack(args))

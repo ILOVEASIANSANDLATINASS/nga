@@ -1,0 +1,346 @@
+------------------------------------------------------------------------------------------------------------------------------------
+Insta kill boss
+------------------------------------------------------------------------------------------------------------------------------------
+while task.wait() do 
+ for i,v in pairs(game.workspace["Boss"]:GetChildren()) do 
+     if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Humanoid.Health < v.Humanoid.MaxHealth  then 
+         v.Humanoid.RigType = "R15"
+     end 
+    end
+end
+------------------------------------------------------------------------------------------------------------------------------------
+Insta kill npcs
+------------------------------------------------------------------------------------------------------------------------------------
+while task.wait() do 
+ for i,v in pairs(game.workspace["Npc's"]:GetChildren()) do 
+     if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Humanoid.Health < v.Humanoid.MaxHealth  then 
+         v.Humanoid.RigType = "R15"
+     end 
+    end
+end
+------------------------------------------------------------------------------------------------------------------------------------
+Insta kill boss swith (r15 to r6) for dungeons  WaveEnemies
+------------------------------------------------------------------------------------------------------------------------------------
+while task.wait(0.1) do
+    for _, v in pairs(workspace:WaitForChild("Boss"):GetChildren()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Humanoid.Health < v.Humanoid.MaxHealth then
+            local humanoid = v:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                -- Toggle between R15 and R6
+                if humanoid.RigType == "R15" then
+                    humanoid.RigType = "R6"
+                else
+                    humanoid.RigType = "R15"
+                end
+            end
+        end
+    end
+end
+------------------------------------------------------------------------------------------------------------------------------------
+Insta kill npcs from dungeons
+------------------------------------------------------------------------------------------------------------------------------------
+while task.wait() do 
+ for i,v in pairs(game.workspace["WaveEnemies"]:GetChildren()) do 
+     if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Humanoid.Health < v.Humanoid.MaxHealth  then 
+         v.Humanoid.RigType = "R15"
+     end 
+    end
+end
+------------------------------------------------------------------------------------------------------------------------------------
+Auto tween to boss
+------------------------------------------------------------------------------------------------------------------------------------
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local bossFolder = workspace:WaitForChild("Boss")
+local serverHandler = ReplicatedStorage:WaitForChild("Game"):WaitForChild("Remotes"):WaitForChild("ServerHandler")
+
+local hitCooldown = 0.1 -- seconds between hits
+local teleportDistance = 50 -- distance from boss to stand
+
+local function teleportToBossAndHit()
+    local bossNpc = nil
+    for _, npc in pairs(bossFolder:GetChildren()) do
+        if npc:IsA("Model") and npc.PrimaryPart then
+            bossNpc = npc
+            break
+        end
+    end
+
+    if not bossNpc then
+        warn("No boss found!")
+        return
+    end
+
+    local targetPos = bossNpc.PrimaryPart.Position
+    local offset = Vector3.new(0, 0, teleportDistance)
+    local destination = targetPos + offset
+
+    -- Teleport player near boss
+    rootPart.CFrame = CFrame.new(destination)
+
+    -- Fire the hit
+    local args = {
+        "CombatControl",
+        "TrueKizaro",
+        1,
+        false
+    }
+    serverHandler:FireServer(unpack(args))
+
+    print("Teleported to boss and hit!")
+end
+
+while true do
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        teleportToBossAndHit()
+    end
+    wait(hitCooldown)
+end
+------------------------------------------------------------------------------------------------------------------------------------
+Auto skill (true kizaru)
+------------------------------------------------------------------------------------------------------------------------------------
+getgenv().a  = true 
+ while wait() do 
+  if a == true then
+
+getgenv().KeysPressed = {"Z","X","C","E"}
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local localPlayer = Players.LocalPlayer
+local toolsFolder = localPlayer.Character
+local remote = ReplicatedStorage:WaitForChild("Game"):WaitForChild("Remotes"):WaitForChild("ServerHandler")
+
+local releaseCFrame = CFrame.new(
+    74.22489166259766, 9.167779922485352, -89.8891372680664,
+    -0.7250876426696777, -5.288308102535666e-08, -0.6886565685272217,
+    -8.961067443635784e-09, 1, -6.735653812484088e-08,
+    0.6886565685272217, -4.266829378707371e-08, -0.7250876426696777
+)
+
+for _, key in ipairs(KeysPressed) do
+    for _, tool in ipairs(toolsFolder:GetChildren()) do
+        if tool:IsA("Tool") then
+            local argsHold = {
+                "SkillsControl",
+                tool.Name,
+                key,
+                "Hold"
+            }
+            remote:FireServer(unpack(argsHold))
+task.wait(.5)
+            local argsRelease = {
+                "SkillsControl",
+                tool.Name,
+                key,
+                "Release",
+                [6] = releaseCFrame
+            }
+            remote:FireServer(unpack(argsRelease))
+        end
+    end
+end
+else
+                    wait()
+                    break 
+                    end 
+                    end
+------------------------------------------------------------------------------------------------------------------------------------
+Auto boss raid (insta kill+ auto skill + auto tween)
+------------------------------------------------------------------------------------------------------------------------------------
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local backpack = player:WaitForChild("Backpack")
+
+local bossFolder = workspace:WaitForChild("Boss")
+local serverHandler = ReplicatedStorage:WaitForChild("Game"):WaitForChild("Remotes"):WaitForChild("ServerHandler")
+
+local hitCooldown = 0.1 -- seconds between hits
+local teleportDistance = 50 -- distance from boss to stand
+local skillKeys = {"Z", "X", "C", "E"}
+local autoSkillEnabled = true
+
+-- Insta kill boss loop
+spawn(function()
+    while true do
+        for _, v in pairs(workspace["Boss"]:GetChildren()) do
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Humanoid.Health < v.Humanoid.MaxHealth then
+                v.Humanoid.RigType = "R15"
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- Equip TrueKizaro tool loop (only equip once)
+spawn(function()
+    local equipped = false
+    while not equipped do
+        local humanoid = player.Character and player.Character:FindFirstChild("Humanoid")
+        local tool = backpack:FindFirstChild("TrueKizaro")
+        if humanoid and tool then
+            humanoid:EquipTool(tool)
+            equipped = true
+            print("Equipped TrueKizaro!")
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Teleport to boss and hit loop
+spawn(function()
+    while true do
+        local bossNpc = nil
+        for _, npc in pairs(bossFolder:GetChildren()) do
+            if npc:IsA("Model") and npc.PrimaryPart then
+                bossNpc = npc
+                break
+            end
+        end
+
+        if bossNpc then
+            local targetPos = bossNpc.PrimaryPart.Position
+            local offset = Vector3.new(0, 0, teleportDistance)
+            local destination = targetPos + offset
+
+            rootPart.CFrame = CFrame.new(destination)
+
+            local args = {
+                "CombatControl",
+                "TrueKizaro",
+                1,
+                false
+            }
+            serverHandler:FireServer(unpack(args))
+            print("Teleported to boss and hit!")
+        else
+            warn("No boss found!")
+        end
+        task.wait(hitCooldown)
+    end
+end)
+
+-- Auto Kizaru skill spam loop
+spawn(function()
+    local releaseCFrame = CFrame.new(
+        74.22489166259766, 9.167779922485352, -89.8891372680664,
+        -0.7250876426696777, -5.288308102535666e-08, -0.6886565685272217,
+        -8.961067443635784e-09, 1, -6.735653812484088e-08,
+        0.6886565685272217, -4.266829378707371e-08, -0.7250876426696777
+    )
+
+    while true do
+        if not autoSkillEnabled then
+            task.wait(1)
+        else
+            for _, key in ipairs(skillKeys) do
+                local toolsFolder = player.Character
+                for _, tool in ipairs(toolsFolder:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        local argsHold = {
+                            "SkillsControl",
+                            tool.Name,
+                            key,
+                            "Hold"
+                        }
+                        serverHandler:FireServer(unpack(argsHold))
+                        task.wait(0.5)
+                        local argsRelease = {
+                            "SkillsControl",
+                            tool.Name,
+                            key,
+                            "Release",
+                            [6] = releaseCFrame
+                        }
+                        serverHandler:FireServer(unpack(argsRelease))
+                    end
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+------------------------------------------------------------------------------------------------------------------------------------
+Auto arise
+------------------------------------------------------------------------------------------------------------------------------------
+getgenv().a  = true 
+ while wait() do 
+  if a == true then
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local function findArisePrompt()
+    for _, descendant in ipairs(workspace:GetDescendants()) do
+        if descendant:IsA("ProximityPrompt") and string.lower(descendant.Name):find("arise") then
+            return descendant
+        end
+    end
+    return nil
+end
+
+local function createPlatformBelow(position)
+    local platform = Instance.new("Part")
+    platform.Size = Vector3.new(20, 1, 20)
+    platform.Position = position + Vector3.new(0, -0.5, 0)
+    platform.Anchored = true
+    platform.Name = "ArisePlatform"
+    platform.BrickColor = BrickColor.new("Really black")
+    platform.Transparency = 0.3
+    platform.CanCollide = true
+    platform.Parent = workspace
+end
+
+local function activateArisePromptThreeTimes()
+    local prompt = findArisePrompt()
+    if not prompt then
+        warn("No Arise prompt found.")
+        return
+    end
+
+    local promptPart = prompt.Parent:IsA("BasePart") and prompt.Parent or prompt.Parent:FindFirstChildWhichIsA("BasePart")
+    if not promptPart then
+        warn("No valid parent part for the Arise prompt.")
+        return
+    end
+
+    -- Step 1: Teleport near the prompt
+    rootPart.CFrame = promptPart.CFrame + Vector3.new(0, 2, 0)
+    wait(0.5)
+
+    -- Step 2: Fire prompt 3 times
+    for i = 1, 3 do
+        fireproximityprompt(prompt)
+        print("Fired Arise prompt (" .. i .. "/3)")
+        wait(4) -- adjust delay to match prompt requirement
+    end
+
+    -- Step 3: Create platform 20 studs above
+    local platformHeight = 20
+    local platformPos = promptPart.Position + Vector3.new(0, platformHeight, 0)
+    createPlatformBelow(platformPos)
+
+    -- Step 4: Teleport player onto platform
+    wait(0.5)
+    rootPart.CFrame = CFrame.new(platformPos + Vector3.new(0, 3, 0))
+    print("Teleported to platform.")
+end
+
+-- Run it once
+activateArisePromptThreeTimes()
+ else
+                    wait()
+                    break 
+                    end 
+                    end 

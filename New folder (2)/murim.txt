@@ -1,0 +1,729 @@
+-- Murim Cultivation Auto Collector Script
+-- Services
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Variables
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Settings
+local instantInteractEnabled = true
+local autoCollectAlchemy = false
+local autoCollectPureQi = false
+local autoCollectInteractables = false
+local isCollecting = false
+local collectDelay = 0.1
+
+-- Crafting Settings
+local selectedPill = "Low Quality Qi Pill"
+local craftQuantity = 1
+
+-- Available pills
+local pillOptions = {
+    "Golden Qi Pill",
+    "Low Quality Qi Pill", 
+    "Demonic Qi Pill",
+    "Third Rate Qi Pill",
+    "Heavenly Qi Pill",
+    "Millenium Qi Pill",
+    "Second Rate Qi Pill",
+    "First Rate Qi Pill",
+    "Beastly Qi Pill"
+}
+
+-- Collected items tracking
+local collectedCount = {
+    alchemy = 0,
+    pureqi = 0,
+    interactables = 0
+}
+
+-- Crafted pills tracking
+local craftedCount = 0
+
+-- Collection loop coroutine
+local collectionLoop = nil
+
+-- Instant interact functionality
+ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt, targetPlayer)
+    if instantInteractEnabled and targetPlayer == player then
+        fireproximityprompt(prompt)
+    end
+end)
+
+-- Function to craft pill
+local function craftPill(pillType, quantity)
+    local success, err = pcall(function()
+        local args = {
+            pillType,
+            -math.abs(quantity), -- Ensure negative value
+            "RNG"
+        }
+        
+        ReplicatedStorage:WaitForChild("Services"):WaitForChild("AlchemyService"):WaitForChild("RE"):WaitForChild("Craft"):FireServer(unpack(args))
+        craftedCount = craftedCount + math.abs(quantity)
+    end)
+    
+    return success
+end
+
+-- Function to recursively find all parts with proximity prompts
+local function findAllPartsWithPrompts(parent)
+    local partsWithPrompts = {}
+    
+    local function scanRecursively(obj)
+        -- Check if this object has a proximity prompt
+        local prompt = obj:FindFirstChildOfClass("ProximityPrompt")
+        if prompt then
+            table.insert(partsWithPrompts, obj)
+        end
+        
+        -- Recursively scan children
+        for _, child in pairs(obj:GetChildren()) do
+            scanRecursively(child)
+        end
+    end
+    
+    scanRecursively(parent)
+    return partsWithPrompts
+end
+
+-- UPDATED: Function to get all collectible items with corrected Pure Qi path
+local function getCollectibleItems()
+    local items = {
+        alchemy = {},
+        pureqi = {},
+        interactables = {}
+    }
+    
+    -- Get Alchemy items from workspace.World.Spawns.AlchemySpawns
+    local success1, alchemySpawns = pcall(function()
+        return workspace.World.Spawns.AlchemySpawns
+    end)
+    
+    if success1 and alchemySpawns then
+        local alchemyItems = findAllPartsWithPrompts(alchemySpawns)
+        for _, item in pairs(alchemyItems) do
+            table.insert(items.alchemy, item)
+        end
+    end
+    
+    -- UPDATED: Get Pure Qi items from workspace.World.Spawns.InteractableSpawns["Pure Qi"].Spawn
+    local success2, pureQiSpawn = pcall(function()
+        return workspace.World.Spawns.InteractableSpawns["Pure Qi"].Spawn
+    end)
+    
+    if success2 and pureQiSpawn then
+        local pureQiItems = findAllPartsWithPrompts(pureQiSpawn)
+        for _, item in pairs(pureQiItems) do
+            table.insert(items.pureqi, item)
+        end
+    end
+    
+    -- Get other interactable items from workspace.World.Spawns.InteractableSpawns (excluding Pure Qi)
+    local success3, interactableSpawns = pcall(function()
+        return workspace.World.Spawns.InteractableSpawns
+    end)
+    
+    if success3 and interactableSpawns then
+        for _, folder in pairs(interactableSpawns:GetChildren()) do
+            if folder.Name ~= "Pure Qi" then
+                -- Check if folder has a Spawn child
+                local spawnFolder = folder:FindFirstChild("Spawn")
+                if spawnFolder then
+                    local otherItems = findAllPartsWithPrompts(spawnFolder)
+                    for _, item in pairs(otherItems) do
+                        table.insert(items.interactables, item)
+                    end
+                else
+                    -- If no Spawn folder, scan the folder directly
+                    local otherItems = findAllPartsWithPrompts(folder)
+                    for _, item in pairs(otherItems) do
+                        table.insert(items.interactables, item)
+                    end
+                end
+            end
+        end
+    end
+    
+    return items
+end
+
+-- Function to teleport to item and collect it
+local function collectItem(item, itemType)
+    if not item or not item.Parent then return false end
+    
+    local prompt = item:FindFirstChildOfClass("ProximityPrompt")
+    if not prompt then return false end
+    
+    -- Find the best part to teleport to
+    local targetPart = nil
+    
+    -- Priority 1: Use the item itself if it's a BasePart
+    if item:IsA("BasePart") then
+        targetPart = item
+    end
+    
+    -- Priority 2: Use PrimaryPart
+    if not targetPart and item.PrimaryPart then
+        targetPart = item.PrimaryPart
+    end
+    
+    -- Priority 3: Find any BasePart in the item
+    if not targetPart then
+        targetPart = item:FindFirstChildOfClass("BasePart")
+    end
+    
+    -- Priority 4: Check parent
+    if not targetPart and item.Parent then
+        if item.Parent:IsA("BasePart") then
+            targetPart = item.Parent
+        elseif item.Parent.PrimaryPart then
+            targetPart = item.Parent.PrimaryPart
+        else
+            targetPart = item.Parent:FindFirstChildOfClass("BasePart")
+        end
+    end
+    
+    if not targetPart then 
+        print("No target part found for:", item.Name)
+        return false 
+    end
+    
+    -- Store original position for debugging
+    local originalPos = humanoidRootPart.Position
+    
+    -- Teleport directly to the item with small offset
+    local teleportPos = targetPart.Position + Vector3.new(0, 2, 0)
+    humanoidRootPart.CFrame = CFrame.new(teleportPos)
+    
+    -- Debug print
+    print("Teleported to:", item.Name, "from", originalPos, "to", teleportPos)
+    
+    -- Wait for teleport to register
+    task.wait(0.3)
+    
+    -- Fire proximity prompt
+    fireproximityprompt(prompt)
+    
+    -- Update counter
+    collectedCount[itemType] = collectedCount[itemType] + 1
+    
+    -- Wait before next collection
+    task.wait(collectDelay)
+    
+    return true
+end
+
+-- Continuous auto collection loop
+local function startAutoCollection()
+    collectionLoop = coroutine.create(function()
+        while isCollecting do
+            -- Update character reference
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                humanoidRootPart = player.Character.HumanoidRootPart
+            else
+                task.wait(1)
+                continue
+            end
+            
+            local items = getCollectibleItems()
+            local totalCollected = 0
+            
+            -- Debug: Print found items
+            print("=== Collection Cycle Started ===")
+            print("Found items - Alchemy:", #items.alchemy, "Pure Qi:", #items.pureqi, "Others:", #items.interactables)
+            
+            -- Collect Alchemy items in continuous loop
+            if autoCollectAlchemy then
+                print("Collecting alchemy items...")
+                for i, item in pairs(items.alchemy) do
+                    if not isCollecting then break end
+                    print("Attempting to collect alchemy item", i, ":", item.Name)
+                    if collectItem(item, "alchemy") then
+                        totalCollected = totalCollected + 1
+                    end
+                end
+            end
+            
+            -- Collect Pure Qi items in continuous loop
+            if autoCollectPureQi then
+                print("Collecting pure qi items...")
+                for i, item in pairs(items.pureqi) do
+                    if not isCollecting then break end
+                    print("Attempting to collect pure qi item", i, ":", item.Name)
+                    if collectItem(item, "pureqi") then
+                        totalCollected = totalCollected + 1
+                    end
+                end
+            end
+            
+            -- Collect other items in continuous loop
+            if autoCollectInteractables then
+                print("Collecting other items...")
+                for i, item in pairs(items.interactables) do
+                    if not isCollecting then break end
+                    print("Attempting to collect other item", i, ":", item.Name)
+                    if collectItem(item, "interactables") then
+                        totalCollected = totalCollected + 1
+                    end
+                end
+            end
+            
+            print("=== Collection Cycle Complete ===")
+            print("Total items collected this cycle:", totalCollected)
+            
+            -- Short wait before next cycle (continuous loop)
+            task.wait(2) -- 2 second delay between full collection cycles
+        end
+        print("Auto collection stopped!")
+    end)
+    
+    coroutine.resume(collectionLoop)
+end
+
+-- Function to stop auto collection
+local function stopAutoCollection()
+    isCollecting = false
+    if collectionLoop then
+        collectionLoop = nil
+    end
+end
+
+-- Load XSX UI Library
+local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/depthso/XSX-UI-Library/refs/heads/main/xsx%20lib.lua'))()
+
+-- UI Colors
+library.headerColor = Color3.fromRGB(138, 43, 226)
+library.companyColor = Color3.fromRGB(75, 0, 130)
+library.acientColor = Color3.fromRGB(148, 0, 211)
+
+-- Initialize Library
+library:Init({
+    version = "1.0",
+    title = "Murim Cultivation",
+    company = "Auto Collector & Crafter",
+    keybind = Enum.KeyCode.RightShift,
+    BlurEffect = false,
+})
+
+-- Watermarks
+library:Watermark("Murim Cultivation | Auto Collector & Crafter")
+
+local FPSWatermark = library:Watermark("FPS")
+game:GetService("RunService").RenderStepped:Connect(function(v)
+    FPSWatermark:SetText("FPS: "..math.round(1/v))
+end)
+
+-- Intro
+library:BeginIntroduction()
+library:AddIntroductionMessage("Initializing Murim Cultivation...")
+wait(0.5)
+library:AddIntroductionMessage("Loading Auto Collector...")
+wait(0.5)
+library:AddIntroductionMessage("Setting up crafting systems...")
+wait(0.5)
+library:AddIntroductionMessage("Ready to cultivate and craft!")
+wait(0.5)
+library:EndIntroduction()
+
+-- Create Main Tab
+local mainTab = library:NewTab("Auto Collector")
+
+-- Instant Interact Section
+mainTab:NewSection("Instant Interact")
+
+local instantInteractToggle = mainTab:NewToggle("Instant Interact", instantInteractEnabled, function(state)
+    instantInteractEnabled = state
+    local message = state and "Instant Interact Enabled!" or "Instant Interact Disabled!"
+    local notifType = state and "success" or "alert"
+    library:Notify(message, 3, notifType)
+end)
+
+-- Auto Collection Section
+mainTab:NewSection("Auto Collection")
+
+-- Master toggle for continuous auto collection
+local masterCollectionToggle = mainTab:NewToggle("Enable Auto Collection", isCollecting, function(state)
+    isCollecting = state
+    if state then
+        library:Notify("Continuous Auto Collection Started! Will loop until disabled!", 3, "success")
+        startAutoCollection()
+    else
+        library:Notify("Auto Collection Stopped!", 3, "alert")
+        stopAutoCollection()
+    end
+end)
+
+-- Individual collection toggles
+local alchemyToggle = mainTab:NewToggle("Auto Collect Alchemy Items", autoCollectAlchemy, function(state)
+    autoCollectAlchemy = state
+    local message = state and "Alchemy Auto Collection Enabled!" or "Alchemy Auto Collection Disabled!"
+    local notifType = state and "success" or "alert"
+    library:Notify(message, 3, notifType)
+end)
+
+local pureQiToggle = mainTab:NewToggle("Auto Collect Pure Qi", autoCollectPureQi, function(state)
+    autoCollectPureQi = state
+    local message = state and "Pure Qi Auto Collection Enabled!" or "Pure Qi Auto Collection Disabled!"
+    local notifType = state and "success" or "alert"
+    library:Notify(message, 3, notifType)
+end)
+
+local interactablesToggle = mainTab:NewToggle("Auto Collect Other Items", autoCollectInteractables, function(state)
+    autoCollectInteractables = state
+    local message = state and "Other Items Auto Collection Enabled!" or "Other Items Auto Collection Disabled!"
+    local notifType = state and "success" or "alert"
+    library:Notify(message, 3, notifType)
+end)
+
+-- Collection Settings
+mainTab:NewSection("Collection Settings")
+
+-- Collection delay input
+local delayInput = mainTab:NewTextbox("Collection Delay (seconds)", tostring(collectDelay), "Enter delay between collections", "small", true, false, function(val)
+    local num = tonumber(val)
+    if num and num >= 0 and num <= 5 then
+        collectDelay = num
+        library:Notify("Collection delay set to " .. num .. " seconds!", 2, "success")
+    else
+        library:Notify("Please enter a valid delay (0-5 seconds)!", 2, "error")
+    end
+end)
+
+-- Statistics Section
+mainTab:NewSection("Statistics")
+
+local alchemyCountLabel = mainTab:NewLabel("Alchemy Items Collected: 0", "left")
+local pureQiCountLabel = mainTab:NewLabel("Pure Qi Collected: 0", "left")
+local interactablesCountLabel = mainTab:NewLabel("Other Items Collected: 0", "left")
+local totalCountLabel = mainTab:NewLabel("Total Items Collected: 0", "left")
+
+-- Reset statistics button
+mainTab:NewButton("Reset Statistics", function()
+    collectedCount.alchemy = 0
+    collectedCount.pureqi = 0
+    collectedCount.interactables = 0
+    library:Notify("Statistics reset!", 2, "success")
+end)
+
+-- Manual Collection Section
+mainTab:NewSection("Manual Collection")
+
+mainTab:NewButton("Collect All Alchemy Items NOW", function()
+    if isCollecting then
+        library:Notify("Auto collection is running! Please disable it first.", 3, "error")
+        return
+    end
+    
+    spawn(function()
+        local items = getCollectibleItems()
+        local collected = 0
+        print("Manual alchemy collection - Found", #items.alchemy, "items")
+        for _, item in pairs(items.alchemy) do
+            if collectItem(item, "alchemy") then
+                collected = collected + 1
+            end
+        end
+        library:Notify("Manually collected " .. collected .. " alchemy items!", 3, "success")
+    end)
+end)
+
+mainTab:NewButton("Collect All Pure Qi NOW", function()
+    if isCollecting then
+        library:Notify("Auto collection is running! Please disable it first.", 3, "error")
+        return
+    end
+    
+    spawn(function()
+        local items = getCollectibleItems()
+        local collected = 0
+        print("Manual pure qi collection - Found", #items.pureqi, "items")
+        for _, item in pairs(items.pureqi) do
+            if collectItem(item, "pureqi") then
+                collected = collected + 1
+            end
+        end
+        library:Notify("Manually collected " .. collected .. " Pure Qi items!", 3, "success")
+    end)
+end)
+
+mainTab:NewButton("Collect All Other Items NOW", function()
+    if isCollecting then
+        library:Notify("Auto collection is running! Please disable it first.", 3, "error")
+        return
+    end
+    
+    spawn(function()
+        local items = getCollectibleItems()
+        local collected = 0
+        print("Manual other items collection - Found", #items.interactables, "items")
+        for _, item in pairs(items.interactables) do
+            if collectItem(item, "interactables") then
+                collected = collected + 1
+            end
+        end
+        library:Notify("Manually collected " .. collected .. " other items!", 3, "success")
+    end)
+end)
+
+mainTab:NewButton("Collect EVERYTHING NOW", function()
+    if isCollecting then
+        library:Notify("Auto collection is running! Please disable it first.", 3, "error")
+        return
+    end
+    
+    spawn(function()
+        local items = getCollectibleItems()
+        local totalCollected = 0
+        
+        print("Manual everything collection - Found total items:", #items.alchemy + #items.pureqi + #items.interactables)
+        
+        -- Collect all alchemy items
+        for _, item in pairs(items.alchemy) do
+            if collectItem(item, "alchemy") then
+                totalCollected = totalCollected + 1
+            end
+        end
+        
+        -- Collect all pure qi items
+        for _, item in pairs(items.pureqi) do
+            if collectItem(item, "pureqi") then
+                totalCollected = totalCollected + 1
+            end
+        end
+        
+        -- Collect all other items
+        for _, item in pairs(items.interactables) do
+            if collectItem(item, "interactables") then
+                totalCollected = totalCollected + 1
+            end
+        end
+        
+        library:Notify("Collected " .. totalCollected .. " items total!", 4, "success")
+    end)
+end)
+
+-- Create Crafting Tab
+local craftingTab = library:NewTab("Pill Crafting")
+
+-- Pill Selection Section
+craftingTab:NewSection("Pill Selection")
+
+-- Pill dropdown
+local pillDropdown = craftingTab:NewSelector("Select Pill Type", selectedPill, pillOptions, function(selected)
+    selectedPill = selected
+    library:Notify("Selected pill: " .. selected, 2, "success")
+end)
+
+-- Quantity input
+local quantityInput = craftingTab:NewTextbox("Craft Quantity", tostring(craftQuantity), "Enter how many pills to craft", "medium", true, false, function(val)
+    local num = tonumber(val)
+    if num and num > 0 and num <= 999999 then
+        craftQuantity = num
+        library:Notify("Craft quantity set to " .. num, 2, "success")
+    else
+        library:Notify("Please enter a valid quantity (1-999999)!", 2, "error")
+    end
+end)
+
+-- Simple Crafting Section
+craftingTab:NewSection("Crafting")
+
+-- Single craft button
+craftingTab:NewButton("Craft Pills", function()
+    if craftPill(selectedPill, craftQuantity) then
+        library:Notify("Crafted " .. craftQuantity .. "x " .. selectedPill .. "!", 3, "success")
+    else
+        library:Notify("Failed to craft " .. selectedPill .. "!", 3, "error")
+    end
+end)
+
+-- Crafting Statistics
+craftingTab:NewSection("Crafting Statistics")
+
+local craftedCountLabel = craftingTab:NewLabel("Pills Crafted: 0", "left")
+local selectedPillLabel = craftingTab:NewLabel("Selected Pill: " .. selectedPill, "left")
+local craftQuantityLabel = craftingTab:NewLabel("Craft Quantity: " .. craftQuantity, "left")
+
+-- Reset crafting statistics
+craftingTab:NewButton("Reset Craft Statistics", function()
+    craftedCount = 0
+    library:Notify("Crafting statistics reset!", 2, "success")
+end)
+
+-- Create Settings Tab
+local settingsTab = library:NewTab("Settings")
+
+-- Information Section
+settingsTab:NewSection("Information")
+settingsTab:NewLabel("Version: 1.0", "left")
+settingsTab:NewLabel("Game: Murim Cultivation", "left")
+settingsTab:NewLabel("Features: Auto Collection & Pill Crafting", "left")
+settingsTab:NewLabel("User: sigmaaboi", "left")
+settingsTab:NewLabel("Date: 2025-06-26 13:32:37", "left")
+
+-- UPDATED Paths Section
+settingsTab:NewSection("Collection Paths")
+settingsTab:NewLabel("Alchemy: workspace.World.Spawns.AlchemySpawns", "left")
+settingsTab:NewLabel("Pure Qi: workspace.World.Spawns.InteractableSpawns['Pure Qi'].Spawn", "left")
+settingsTab:NewLabel("Others: workspace.World.Spawns.InteractableSpawns", "left")
+
+-- Crafting Info Section
+settingsTab:NewSection("Crafting Information")
+settingsTab:NewLabel("Service: ReplicatedStorage.Services.AlchemyService", "left")
+settingsTab:NewLabel("Method: Craft RemoteEvent", "left")
+settingsTab:NewLabel("Format: [PillName, -Quantity, 'RNG']", "left")
+
+-- Debug Section
+settingsTab:NewSection("Debug")
+
+settingsTab:NewButton("Debug: Print All Paths", function()
+    print("=== DEBUG: Checking all paths ===")
+    
+    -- Check Alchemy path
+    local success1, alchemySpawns = pcall(function()
+        return workspace.World.Spawns.AlchemySpawns
+    end)
+    
+    if success1 and alchemySpawns then
+        print("✓ AlchemySpawns found, children:", #alchemySpawns:GetChildren())
+        for i, child in pairs(alchemySpawns:GetChildren()) do
+            print("  ", i, child.Name, child.ClassName)
+        end
+    else
+        print("✗ AlchemySpawns not found!")
+    end
+    
+    -- UPDATED: Check Pure Qi path
+    local success2, pureQiSpawn = pcall(function()
+        return workspace.World.Spawns.InteractableSpawns["Pure Qi"].Spawn
+    end)
+    
+    if success2 and pureQiSpawn then
+        print("✓ Pure Qi Spawn found, children:", #pureQiSpawn:GetChildren())
+        for i, child in pairs(pureQiSpawn:GetChildren()) do
+            print("  ", i, child.Name, child.ClassName)
+        end
+    else
+        print("✗ Pure Qi Spawn not found!")
+    end
+    
+    -- Check Interactables path
+    local success3, interactableSpawns = pcall(function()
+        return workspace.World.Spawns.InteractableSpawns
+    end)
+    
+    if success3 and interactableSpawns then
+        print("✓ InteractableSpawns found, children:", #interactableSpawns:GetChildren())
+        for i, child in pairs(interactableSpawns:GetChildren()) do
+            print("  ", i, child.Name, child.ClassName)
+            if child:FindFirstChild("Spawn") then
+                print("    ✓ Has Spawn folder with", #child.Spawn:GetChildren(), "children")
+            end
+        end
+    else
+        print("✗ InteractableSpawns not found!")
+    end
+    
+    library:Notify("Debug info printed to console! Check F9 Developer Console", 4, "")
+end)
+
+settingsTab:NewButton("List Available Items", function()
+    local items = getCollectibleItems()
+    local alchemyCount = #items.alchemy
+    local pureQiCount = #items.pureqi
+    local interactableCount = #items.interactables
+    
+    print("Available items with proximity prompts:")
+    print("Alchemy:", alchemyCount)
+    print("Pure Qi:", pureQiCount) 
+    print("Others:", interactableCount)
+    
+    library:Notify("Available Items - Alchemy: " .. alchemyCount .. ", Pure Qi: " .. pureQiCount .. ", Others: " .. interactableCount, 5, "")
+end)
+
+settingsTab:NewButton("Test Teleport to Random Item", function()
+    local items = getCollectibleItems()
+    local allItems = {}
+    
+    -- Combine all items
+    for _, item in pairs(items.alchemy) do
+        table.insert(allItems, item)
+    end
+    for _, item in pairs(items.pureqi) do
+        table.insert(allItems, item)
+    end
+    for _, item in pairs(items.interactables) do
+        table.insert(allItems, item)
+    end
+    
+    if #allItems > 0 then
+        local randomItem = allItems[math.random(1, #allItems)]
+        print("Testing teleport to:", randomItem.Name)
+        
+        -- Use same logic as collectItem
+        local targetPart = nil
+        if randomItem:IsA("BasePart") then
+            targetPart = randomItem
+        elseif randomItem.PrimaryPart then
+            targetPart = randomItem.PrimaryPart
+        else
+            targetPart = randomItem:FindFirstChildOfClass("BasePart")
+        end
+        
+        if targetPart then
+            local teleportPos = targetPart.Position + Vector3.new(0, 2, 0)
+            humanoidRootPart.CFrame = CFrame.new(teleportPos)
+            library:Notify("Teleported to: " .. randomItem.Name, 3, "success")
+        else
+            library:Notify("Could not find part to teleport to!", 3, "error")
+        end
+    else
+        library:Notify("No items found!", 3, "error")
+    end
+end)
+
+settingsTab:NewButton("Test Craft Single Pill", function()
+    if craftPill(selectedPill, 1) then
+        library:Notify("Test craft successful! Crafted 1x " .. selectedPill, 3, "success")
+    else
+        library:Notify("Test craft failed!", 3, "error")
+    end
+end)
+
+-- Update character reference when respawning
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+end)
+
+-- UI Update Loop
+spawn(function()
+    while true do
+        task.wait(1)
+        
+        -- Update collection statistics labels
+        alchemyCountLabel:SetText("Alchemy Items Collected: " .. collectedCount.alchemy)
+        pureQiCountLabel:SetText("Pure Qi Collected: " .. collectedCount.pureqi)
+        interactablesCountLabel:SetText("Other Items Collected: " .. collectedCount.interactables)
+        
+        local total = collectedCount.alchemy + collectedCount.pureqi + collectedCount.interactables
+        totalCountLabel:SetText("Total Items Collected: " .. total)
+        
+        -- Update crafting statistics labels
+        craftedCountLabel:SetText("Pills Crafted: " .. craftedCount)
+        selectedPillLabel:SetText("Selected Pill: " .. selectedPill)
+        craftQuantityLabel:SetText("Craft Quantity: " .. craftQuantity)
+    end
+end)
+
+-- Success notification
+library:Notify("Murim Cultivation Auto Collector & Crafter loaded successfully!", 4, "success")
+library:Notify("Welcome sigmaaboi! Enable toggles to start collecting and crafting!", 3, "")
+library:Notify("Pure Qi path updated! Auto Collection will run continuously until disabled!", 4, "")

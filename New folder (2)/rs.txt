@@ -1,0 +1,7 @@
+local ohTable1 = {
+    ["toggleState"] = false,
+    ["name"] = "GAME MUSIC",
+    ["sliderState"] = workspace
+}
+
+game:GetService("ReplicatedStorage").Source.Shared.Packages.Net["RE/SaveSetting"]:FireServer(ohTable1)

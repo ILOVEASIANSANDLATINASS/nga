@@ -1,0 +1,236 @@
+-- LinoriaLib setup FIRST!
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+-- Now your macro logic, folders, functions, etc.
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GameEvents = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Game")
+local SellRemote = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Packages")
+    :WaitForChild("Knit"):WaitForChild("Services")
+    :WaitForChild("GameService"):WaitForChild("RF"):WaitForChild("SellUnit")
+
+-- Macro folders
+local macroFolder = "apd/Macros"
+local settingsFolder = "apd/Settings"
+if not isfolder("apd") then makefolder("apd") end
+if not isfolder(macroFolder) then makefolder(macroFolder) end
+if not isfolder(settingsFolder) then makefolder(settingsFolder) end
+
+-- Macro logic
+local macro = {}
+local recording = false
+local startTime = 0
+local SelectedMacro = ""
+local hooked = false
+
+local function listMacros()
+    local list = {}
+    for _, file in ipairs(listfiles(macroFolder)) do
+        local name = file:match("([^/\\]+%.txt)$")
+        if name then
+            table.insert(list, name)
+        end
+    end
+    return list
+end
+
+-- Improved parseCFrame function for comma-separated numbers
+local function parseCFrame(str)
+    local nums = {}
+    for num in str:gmatch("[-%d%.e]+") do
+        table.insert(nums, tonumber(num))
+    end
+    if #nums == 12 then
+        return CFrame.new(unpack(nums))
+    else
+        warn("Invalid CFrame string: " .. tostring(str))
+        return CFrame.new()
+    end
+end
+
+function startRecording()
+    if SelectedMacro == "" then
+        Library:Notify("Please enter/select a macro name first!", 3)
+        return
+    end
+    recording = true
+    startTime = tick()
+    macro = {}
+    Library:Notify("Recording started: " .. SelectedMacro, 2)
+end
+
+function stopRecording()
+    recording = false
+    if SelectedMacro ~= "" and #macro > 0 then
+        local macroJson = HttpService:JSONEncode(macro)
+        writefile(macroFolder .. "/" .. SelectedMacro, macroJson)
+        setclipboard(macroJson)
+        Library:Notify("Macro saved & copied to clipboard: " .. SelectedMacro, 2)
+    else
+        Library:Notify("No macro name or nothing recorded.", 2)
+    end
+end
+
+function replayMacro()
+    if SelectedMacro == "" then
+        Library:Notify("No macro selected.", 2)
+        return
+    end
+    local path = macroFolder .. "/" .. SelectedMacro
+    if not isfile(path) then
+        Library:Notify("Macro file not found: " .. SelectedMacro, 2)
+        return
+    end
+    local data = HttpService:JSONDecode(readfile(path))
+    task.spawn(function()
+        for _, action in ipairs(data) do
+            task.wait(0.5)
+            if action.type == "PlaceUnit" then
+                GameEvents:FireServer("PlaceUnit", action.id, parseCFrame(action.position), action.tag)
+            elseif action.type == "UpgradeUnit" then
+                GameEvents:FireServer("UpgradeUnit", action.unitId)
+            elseif action.type == "SellUnit" then
+                SellRemote:InvokeServer(action.unitId)
+            end
+        end
+    end)
+    Library:Notify("Replaying macro: " .. SelectedMacro, 2)
+end
+
+-- Only hook once
+if not hooked then
+    hooked = true
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local args = { ... }
+        local method = getnamecallmethod()
+        local name = tostring(self)
+        -- Adjusted for your game's remote structure
+        if recording then
+            if method == "FireServer" and name == "Game" then
+                if args[1] == "PlaceUnit" then
+                    table.insert(macro, {
+                        type = "PlaceUnit",
+                        time = tick() - startTime,
+                        id = args[2],
+                        position = tostring(args[3]),
+                        tag = args[4],
+                    })
+                elseif args[1] == "UpgradeUnit" then
+                    table.insert(macro, {
+                        type = "UpgradeUnit",
+                        time = tick() - startTime,
+                        unitId = args[2]
+                    })
+                end
+            elseif method == "InvokeServer" and name == "SellUnit" then
+                table.insert(macro, {
+                    type = "SellUnit",
+                    time = tick() - startTime,
+                    unitId = args[1]
+                })
+            end
+        end
+        return oldNamecall(self, ...)
+    end))
+end
+
+-- UI Setup (your provided LinoriaLib code)
+local Window = Library:CreateWindow({
+    Title = "Crazy-hub",
+    Footer = "version: V1",
+    Icon = 95816097006870,
+    NotifySide = "Right",
+    ShowCustomCursor = false,
+})
+
+local Tabs = {
+    Main = Window:AddTab("Main", "user"),
+    Key = Window:AddKeyTab("Key System"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+-- Macro Recorder UI
+local MacroGroup = Tabs.Main:AddLeftGroupbox("Macro Recorder")
+
+MacroGroup:AddInput("MacroNameInput", {
+    Text = "Macro Name",
+    Placeholder = "example_macro.txt",
+    Callback = function(val)
+        if not val:match("%.txt$") then val = val .. ".txt" end
+        SelectedMacro = val
+    end
+})
+
+MacroGroup:AddButton({
+    Text = "Create Macro File",
+    Func = function()
+        local name = Options.MacroNameInput.Value
+        if name and name ~= "" then
+            if not name:match("%.txt$") then
+                name = name .. ".txt"
+            end
+            local path = macroFolder .. "/" .. name
+            if isfile(path) then
+                Library:Notify("File already exists: " .. name, 2)
+            else
+                writefile(path, HttpService:JSONEncode({}))
+                Options.MacroSelector:SetValues(listMacros())
+                SelectedMacro = name
+                Library:Notify("Macro file created: " .. name, 2)
+            end
+        else
+            Library:Notify("Please enter a valid macro name first.", 2)
+        end
+    end
+})
+
+MacroGroup:AddDropdown("MacroSelector", {
+    Values = listMacros(),
+    Text = "Select Macro",
+    Callback = function(val)
+        SelectedMacro = val
+    end
+})
+
+MacroGroup:AddButton({
+    Text = "Refresh Macro List",
+    Func = function()
+        Options.MacroSelector:SetValues(listMacros())
+    end
+})
+
+MacroGroup:AddButton({
+    Text = "Start Recording",
+    Func = startRecording
+})
+
+MacroGroup:AddButton({
+    Text = "Stop Recording",
+    Func = stopRecording
+})
+
+MacroGroup:AddButton({
+    Text = "Replay Macro",
+    Func = replayMacro
+})
+
+-- Rest of your UI (unchanged)
+-- ...existing LinoriaLib UI code here...
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+ThemeManager:SetFolder("MyScriptHub")
+SaveManager:SetFolder("MyScriptHub/specific-game")
+SaveManager:SetSubFolder("specific-place")
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+SaveManager:LoadAutoloadConfig()

@@ -1,0 +1,267 @@
+local currentMacros = {}
+for _, v in pairs(listfiles("./")) do
+	local matchedFile = string.match(v, "(.+%.txt)") -- Ensure the file ends with .txt
+	if matchedFile then
+		table.insert(currentMacros, matchedFile) -- Store the full file path
+	end
+end
+
+local macrofile = sections.MainSection6:Dropdown({
+	Name = "Select Macro:",
+	Multi = false,
+	Required = true,
+	Options = currentMacros,
+	Default = 1,
+	Callback = function(Value)
+		getgenv().SelectedMacro = Value
+	end,
+}, "SelectMacro")
+
+sections.MainSection6:Input({
+	Name = "Enter Macro Name:",
+	Placeholder = "",
+	AcceptedCharacters = "All",
+	Callback = function(input)
+		  getgenv().MacroName = input .. ".txt"
+	end,
+	onChanged = function(input)
+	  getgenv().MacroName = input .. ".txt"
+	end,
+}, "MacroName")
+
+sections.MainSection6:Button({
+	Name = "Create Entered Macro Name",
+	Callback = function()
+		writefile(getgenv().MacroName, "Created By Kazoun.")
+		macrofile:ClearOptions()
+		task.wait(.5)
+
+		local currentMacros = {}
+for _, v in pairs(listfiles("./")) do
+	local matchedFile = string.match(v, "(.+%.txt)") -- Ensure the file ends with .txt
+	if matchedFile then
+		table.insert(currentMacros, matchedFile) -- Store the full file path
+	end
+end
+macrofile:InsertOptions(currentMacros)
+
+	end,
+})
+
+sections.MainSection6:Button({
+	Name = "Delete Selected Macro",
+	Callback = function()
+		delfile(getgenv().SelectedMacro, "Created By Kazoun.")
+		macrofile:ClearOptions()
+		task.wait(.5)
+
+		local currentMacros = {}
+for _, v in pairs(listfiles("./")) do
+	local matchedFile = string.match(v, "(.+%.txt)") -- Ensure the file ends with .txt
+	if matchedFile then
+		table.insert(currentMacros, matchedFile) -- Store the full file path
+	end
+end
+macrofile:InsertOptions(currentMacros)
+	end,
+})
+
+
+sections.MainSection6:Divider()
+
+sections.MainSection6:Toggle({
+	Name = "Record Macro",
+	Default = false,
+	Callback = function(state)
+	  if state then 
+		repeat wait() until game:IsLoaded() 
+
+		if game:GetService("Players").LocalPlayer.PlayerGui.GUI.SkipwaveFrame.Visible  == true then 
+
+			local args = {
+				[1] = "Vote1"
+			}
+			
+			game:GetService("ReplicatedStorage"):WaitForChild("PlayMode"):WaitForChild("Events"):WaitForChild("Vote"):InvokeServer(unpack(args))
+			
+			
+		end 
+		
+		
+		local startTime = tick()
+		local towerRecord = {}
+		local httpService = game:GetService("HttpService")
+		local mt = getrawmetatable(game)
+		local oldNamecall = mt.__namecall
+		setreadonly(mt, false)
+		mt.__namecall = newcclosure(function(self, ...)
+			args = {...}
+			if getnamecallmethod() == "InvokeServer" and tostring(self) == "spawnunit" then
+				local unit = args[1][1]
+				local origin = args[1][2]
+				towerRecord[#towerRecord + 1] = {
+					["time"] = tick() - startTime; 
+					["moneyreq"] = tostring(game.Players.LocalPlayer.GameData.Yen.Value);
+					["character"] = args[1][1]; 
+					["position"] = origin and tostring(origin) or "Origin is missing";
+					["id"] = args[2];
+					["type"] = "CreateUnit";
+				}        
+			elseif getnamecallmethod() == "InvokeServer" and tostring(self) == "ManageUnits" then
+				if args[1] == "Upgrade" then
+					towerRecord[#towerRecord + 1] = {
+						["time"] = tick() - startTime, 
+						["moneyreq"] = tostring(game.Players.LocalPlayer.GameData.Yen.Value),
+						["character"] = args[2], 
+						["type"] = "UpgradeUnit"
+					}
+				elseif args[1] == "Selling" then
+					towerRecord[#towerRecord + 1] = {
+						["time"] = tick() - startTime, 
+						["moneyreq"] = tostring(game.Players.LocalPlayer.GameData.Yen.Value),
+						["character"] = args[2], 
+						["type"] = "SellUnit"
+					}
+				end     
+			end
+		
+			
+			return oldNamecall(self, unpack(args))
+		end)
+		setreadonly(mt, true)
+		
+		spawn(function()
+		   
+			while task.wait() do 
+					writefile(getgenv().SelectedMacro, httpService:JSONEncode(towerRecord))
+			end
+		end)
+		
+	  end 
+	end,
+}, "RecordMacroToggle")
+
+local Replay = sections.MainSection6:Toggle({
+	Name = "Replay Macro",
+	Default = false,
+	Callback = function(state)
+	if state then 
+		local replayName =  getgenv().SelectedMacro
+		local startTime = tick()
+		local macro = readfile(replayName)
+		local httpService = game:GetService("HttpService")
+		local recordTowers = httpService:JSONDecode(macro)
+		
+		local function stcf(s)
+			return loadstring("return CFrame.new(" .. s .. ");")()
+		end
+		
+		local function waitForMoney(requiredAmount)
+			local maxWaitTime = 5
+			local start = tick()
+			while tonumber(game.Players.LocalPlayer.GameData.Yen.Value) < tonumber(requiredAmount) do
+				if tick() - start > maxWaitTime then
+					warn("Timeout waiting for enough money!")
+					return false
+				end
+				task.wait(0.2)
+			end
+			return true
+		end
+		
+		local function place(info)
+			if not waitForMoney(info.moneyreq) then return end
+		
+			local args = {
+				[1] = {
+					[1] = info.character,
+					[2] = stcf(info.position),
+					[3] = 0
+				},
+				[2] = info.id
+			}
+			
+			local success, err = pcall(function()
+				game:GetService("ReplicatedStorage").PlayMode.Events.spawnunit:InvokeServer(unpack(args))
+			end)
+			
+			if success then
+				print("Placed " .. info.character)
+				MoneyUsed:UpdateName("Money Used: " .. info.moneyreq .. " $")
+				UnitPlaced:UpdateName("Unit Placed: " .. info.character)
+			else
+				warn("Failed to place " .. info.character .. ": " .. tostring(err))
+			end
+		
+			task.wait(0.2) -- Prevent skipping
+		end
+		
+		local function upgrade(info)
+			if not waitForMoney(info.moneyreq) then return end
+		
+			local args = {
+				[1] = "Upgrade",
+				[2] = info.character
+			}
+		
+			local success, err = pcall(function()
+				game:GetService("ReplicatedStorage").PlayMode.Events.ManageUnits:InvokeServer(unpack(args))
+			end)
+			
+			if success then
+				print("Upgraded " .. info.character)
+				MoneyUsed:UpdateName("Money Used: " .. info.moneyreq .. " $")
+		UnitUpgraded:UpdateName("Unit Upgraded: " .. info.character)
+			else
+				warn("Failed to upgrade " .. info.character .. ": " .. tostring(err))
+			end
+		
+			task.wait(0.2)
+		end
+		
+		local function sell(info)
+			if not waitForMoney(info.moneyreq) then return end
+		
+			local args = {
+				[1] = "Selling",
+				[2] = info.character
+			}
+		
+			local success, err = pcall(function()
+				game:GetService("ReplicatedStorage").PlayMode.Events.ManageUnits:InvokeServer(unpack(args))
+			end)
+		
+			if success then
+				print("Sold " .. info.character)
+				MoneyUsed:UpdateName("Money Used: " .. info.moneyreq .. " $")
+		UnitSold:UpdateName("Unit Sold: " .. info.character)
+			else
+				warn("Failed to sell " .. info.character .. ": " .. tostring(err))
+			end
+		
+			task.wait(0.2)
+		end
+		
+		local tower = 1
+		spawn(function()
+			while task.wait() do
+				if not recordTowers[tower] then break end
+		
+				local currentTask = recordTowers[tower]
+				if tonumber(currentTask.moneyreq) <= tonumber(game.Players.LocalPlayer.GameData.Yen.Value) then
+					if currentTask.type == "CreateUnit" then 
+						place(currentTask)
+					elseif currentTask.type == "UpgradeUnit" then 
+						upgrade(currentTask)
+					elseif currentTask.type == "SellUnit" then 
+						sell(currentTask)
+					end
+					recordTowers[tower] = nil
+					tower = tower + 1
+				end
+			end
+		end)
+	end 
+	end,
+}, "ReplayMacroToggle")
+

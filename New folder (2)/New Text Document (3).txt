@@ -1,0 +1,190 @@
+-- Load Fluent UI
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- Create Fluent Window
+local Window = Fluent:CreateWindow({
+    Title = "✨ SSS Stat Roller ✨",
+    SubTitle = "by dawid",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(400, 300),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "settings" })
+}
+
+-- UI Elements
+local UnitBox = Tabs.Main:AddInput("UnitInput", {
+    Title = "Enter Unit ID",
+    Default = "",
+    Placeholder = "Unit ID",
+    Numeric = false,
+    Finished = false,
+    Callback = function(Value)
+        print("Unit ID entered:", Value)
+    end
+})
+
+-- Store the stat names and create dropdowns for each stat
+local statNames = {"Damage", "SPA", "Range"}
+local statDropdowns = {}
+
+-- Initialize dropdowns for each stat
+for i, stat in ipairs(statNames) do
+    statDropdowns[stat] = Tabs.Main:AddDropdown(stat, {
+        Title = stat,
+        Values = {"None", "F", "E", "D", "C", "B+", "A", "A+", "S", "SS", "SSS"},
+        Multi = false,
+        Default = 1,
+    })
+
+    -- Print the value selected when changed
+    statDropdowns[stat]:OnChanged(function(Value)
+        print(stat .. " selected grade:", Value)
+    end)
+end
+
+-- Store toggles and other flags
+local toggles = {}
+local isRolling = false
+
+-- Initialize Status Label (use Content to update the status)
+local StatusLabel = Tabs.Main:AddParagraph({
+    Title = "Status",
+    Content = "Status: Waiting..."
+})
+
+-- Function to stop the rolling process
+local function stopRolling()
+    isRolling = false
+    print("Rolling process stopped.")
+end
+
+-- Function to lock a stat
+local function lockStat(statServerName, unitId)
+    local args = {
+        [1] = unitId,
+        [2] = statServerName
+    }
+    game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("UnitService"):WaitForChild("RF"):WaitForChild("AddLockToUnit"):InvokeServer(unpack(args))
+    print("Locked:", statServerName)
+end
+
+-- Start Rolling Button
+local StartButton = Tabs.Main:AddButton({
+    Title = "START ROLLING",
+    Description = "Start the stat rolling process",
+    Callback = function()
+        local unitId = UnitBox.Value
+        if unitId == "" then
+            print("Please enter a valid Unit ID.")
+            return
+        end
+
+        -- Main logic for rolling stats
+        print("Starting to roll stats for Unit ID:", unitId)
+        isRolling = true
+        local lockedStats = {
+            Damage = false,
+            SPA = false,
+            Range = false
+        }
+
+        local statMapping = {
+            Damage = "damagePerAttack",
+            SPA = "secondsPerAttack",
+            Range = "range"
+        }
+
+        -- UI Feedback
+        local statusText = "Rolling stats..."
+        StatusLabel.Content = "Status: " .. statusText
+
+        -- While the rolling process is running
+        while isRolling do
+            local anyStatRolled = false
+
+            -- Loop through each stat and check if it's selected and locked
+            for stat, dropdown in pairs(statDropdowns) do
+                local selectedGrade = dropdown.Value -- Get the selected grade
+
+                if selectedGrade ~= "None" and not lockedStats[stat] then
+                    print(stat .. " selected for lock: " .. selectedGrade)
+
+                    -- Roll stats and lock the stat when the required grade is matched
+                    local rollArgs = { [1] = unitId }
+                    local response = game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("UnitService"):WaitForChild("RF"):WaitForChild("RollStats"):InvokeServer(unpack(rollArgs))
+
+                    if type(response) == "table" then
+                        anyStatRolled = true
+                        for key, value in pairs(response) do
+                            if value == selectedGrade then
+                                for statName, serverName in pairs(statMapping) do
+                                    if stat == statName and key == serverName then
+                                        lockStat(serverName, unitId)
+                                        lockedStats[stat] = true
+                                        print(stat .. " locked at " .. selectedGrade)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- If all selected stats are locked, break out of the loop
+            local allStatsLocked = true
+            for stat, selectedGrade in pairs(statDropdowns) do
+                if selectedGrade.Value ~= "None" and not lockedStats[stat] then
+                    allStatsLocked = false
+                    break
+                end
+            end
+
+            if allStatsLocked then
+                statusText = "✅ ALL SELECTED STATS LOCKED!"
+                StatusLabel.Content = "Status: " .. statusText
+                print("✅ ALL SELECTED STATS LOCKED!")
+                break
+            elseif not anyStatRolled then
+                statusText = "⚠️ Rolling failed for some stats, retrying..."
+                StatusLabel.Content = "Status: " .. statusText
+            else
+                statusText = "Rolling stats..."
+                StatusLabel.Content = "Status: " .. statusText
+            end
+
+            wait(1) -- slow down the spinning by increasing the delay time
+        end
+    end
+})
+
+-- Stop Rolling Button
+local StopButton = Tabs.Main:AddButton({
+    Title = "STOP",
+    Description = "Stop the rolling process",
+    Callback = function()
+        stopRolling()
+    end
+})
+
+-- Notify user that the script has loaded
+Fluent:Notify({
+    Title = "Stat Roller",
+    Content = "The Stat Roller script has been loaded.",
+    Duration = 5
+})
+
+-- Optional: SaveManager & InterfaceManager setup (for configurations)
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:SetFolder("StatRoller")
+InterfaceManager:SetFolder("StatRoller/Interface")
+
+-- Select Main tab
+Window:SelectTab(1)

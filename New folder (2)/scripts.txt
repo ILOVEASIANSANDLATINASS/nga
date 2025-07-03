@@ -1,0 +1,150 @@
+------------------------------------------------------------------------------------------------------------------------------
+kazoung script sigma boy
+loadstring(game:HttpGet("https://pastebin.com/raw/qia6H7zb"))()
+------------------------------------------------------------------------------------------------------------------------------
+auto clicker
+getgenv().key = "Hostile"
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Hosvile/The-telligence/main/MC%20KSystem%202"))()
+------------------------------------------------------------------------------------------------------------------------------
+KAZOUN AUTO SIGMA SCRIPT
+getgenv().Open = true
+getgenv().TimeToContinue = 60 -- seconds | MUST CONVERT TO SECONDS
+
+local Player = game.Players.LocalPlayer
+local vim = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Start the timer
+local startTime = os.clock()
+
+while true do
+    if getgenv().Open then
+        -- Perform the main operations
+        local args = {
+            [1] = "EventClover",
+            [2] = "gems10"
+        }
+
+        ReplicatedStorage:WaitForChild("endpoints"):WaitForChild("client_to_server"):WaitForChild("buy_from_banner"):InvokeServer(unpack(args))    
+        task.wait(0.1) 
+
+        -- Check if the timer has reached getgenv().TimeToContinue
+        if os.clock() - startTime >= getgenv().TimeToContinue then
+            -- Execute "stuff under"
+            getgenv().Open = false
+            task.wait(12)
+            print("press K")
+            -- Press "K" key
+            game:GetService("VirtualInputManager"):SendKeyEvent(true, "K", false, game)
+            game:GetService("VirtualInputManager"):SendKeyEvent(false, "K", false, game)
+
+            task.wait(2.5) -- Remove the shiny leg to normal leg
+            for i, v in pairs(Player.PlayerGui.collection.grid.List.Outer.UnitFrames:GetChildren()) do
+                if v:IsA("ImageButton") and v.Visible and v:FindFirstChild("Border") and not v.Border:FindFirstChild("rainbow") and v:FindFirstChild("_uuid") then
+                    local args = { [1] = v._uuid.Value }
+                    ReplicatedStorage:WaitForChild("endpoints"):WaitForChild("client_to_server"):WaitForChild("request_remove_shiny"):InvokeServer(unpack(args))
+                end
+            end
+
+            task.wait(2.5) -- Delete normal leg except lelouch cuz same id stuff
+            for i, v in pairs(Player.PlayerGui.collection.grid.List.Outer.UnitFrames:GetChildren()) do
+                if v:IsA("ImageButton") and v.Visible and v.name.Text ~= "Lulu" and v:FindFirstChild("Border") and not v.Border:FindFirstChild("rainbow") and v:FindFirstChild("_uuid") then
+                    local args = {
+                        [1] = {
+                            [1] = v._uuid.Value
+                        }
+                    }
+                    ReplicatedStorage:WaitForChild("endpoints"):WaitForChild("client_to_server"):WaitForChild("sell_units"):InvokeServer(unpack(args))
+                end
+            end
+
+            task.wait(2.5) -- Sell normal mythic (except Lelouch)
+            for i, v in pairs(Player.PlayerGui.collection.grid.List.Outer.UnitFrames:GetChildren()) do
+                if v:IsA("ImageButton") and v.Visible then
+                    local worldModel = v.Main.View.WorldModel
+                    for _, child in pairs(worldModel:GetChildren()) do
+                        if not string.find(child.Name, ":shiny") and child.Name ~= "lelouch" then
+                            local args = {
+                                [1] = {
+                                    [1] = v._uuid.Value
+                                }
+                            }
+                            ReplicatedStorage:WaitForChild("endpoints"):WaitForChild("client_to_server"):WaitForChild("sell_units"):InvokeServer(unpack(args))
+                        end
+                    end
+                end
+            end
+
+            task.wait(2)
+            vim:SendKeyEvent(true, "K", false, game)
+            vim:SendKeyEvent(false, "K", false, game)
+
+            -- Reset the timer and continue the process
+            startTime = os.clock()
+            getgenv().Open = true
+        end
+    end
+    task.wait(0.1)
+end
+------------------------------------------------------------------------------------------------------------------------------
+auto afk
+wait(0.5)local ba=Instance.new("ScreenGui")
+local ca=Instance.new("TextLabel")local da=Instance.new("Frame")
+local _b=Instance.new("TextLabel")local ab=Instance.new("TextLabel")ba.Parent=game.CoreGui
+ba.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;ca.Parent=ba;ca.Active=true
+ca.BackgroundColor3=Color3.new(0.176471,0.176471,0.176471)ca.Draggable=true
+ca.Position=UDim2.new(0.698610067,0,0.098096624,0)ca.Size=UDim2.new(0,370,0,52)
+ca.Font=Enum.Font.SourceSansSemibold;ca.Text="Anti Afk"ca.TextColor3=Color3.new(0,1,1)
+ca.TextSize=22;da.Parent=ca
+da.BackgroundColor3=Color3.new(0.196078,0.196078,0.196078)da.Position=UDim2.new(0,0,1.0192306,0)
+da.Size=UDim2.new(0,370,0,107)_b.Parent=da
+_b.BackgroundColor3=Color3.new(0.176471,0.176471,0.176471)_b.Position=UDim2.new(0,0,0.800455689,0)
+_b.Size=UDim2.new(0,370,0,21)_b.Font=Enum.Font.Arial;_b.Text="Made by Crazy"
+_b.TextColor3=Color3.new(0,1,1)_b.TextSize=20;ab.Parent=da
+ab.BackgroundColor3=Color3.new(0.176471,0.176471,0.176471)ab.Position=UDim2.new(0,0,0.158377,0)
+ab.Size=UDim2.new(0,370,0,44)ab.Font=Enum.Font.ArialBold;ab.Text="Status: Active"
+ab.TextColor3=Color3.new(0,1,1)ab.TextSize=20;local bb=game:service'VirtualUser'
+game:service'Players'.LocalPlayer.Idled:connect(function()
+bb:CaptureController()bb:ClickButton2(Vector2.new())
+ab.Text="Roblox tried kicking you buy I didnt let them!"wait(2)ab.Text="Status : Active"end)
+------------------------------------------------------------------------------------------------------------------------------
+BUANGHUB KING
+script_key="zaXhMkZBKHieSObeRDFJioySPNUpCSMe";
+loadstring(game:HttpGet("https://raw.githubusercontent.com/buang5516/buanghub/main/PremiumBuangHub.lua"))()
+------------------------------------------------------------------------------------------------------------------------------
+old auto open kazoun
+getgenv().Open = false
+getgenv().TimeToContinue = 2
+loadstring(game:HttpGet("https://raw.githubusercontent.com/YOies/sigma/refs/heads/main/randomsigma"))()
+------------------------------------------------------------------------------------------------------------------------------
+infiniteyield sigma
+loadstring(game:HttpGet(('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'),true))()
+------------------------------------------------------------------------------------------------------------------------------
+auto open anime royal
+getgenv().a = true
+while task.wait(0.1) do
+    if a == true then
+        local args = {
+            [1] = "Summon",
+            [2] = "SpecialBanner",
+            [3] = 10
+        }
+
+        game:GetService("ReplicatedStorage"):WaitForChild("EventsAndFunctions"):WaitForChild("RemoteFunctions"):WaitForChild("Summon"):InvokeServer(unpack(args))
+    else
+        wait()
+        break
+    end
+end
+------------------------------------------------------------------------------------------------------------------------------
+limit break shi
+------------------------------------------------------------------------------------------------------------------------------
+local args = {
+	"Ruffy"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Remote"):WaitForChild("LimitBreak"):InvokeServer(unpack(args))
+------------------------------------------------------------------------------------------------------------------------------
+abyss 
+------------------------------------------------------------------------------------------------------------------------------
+game:GetService("ReplicatedStorage").Remote.TeleportToStage:FireServer("Abyss_50")
+------------------------------------------------------------------------------------------------------------------------------

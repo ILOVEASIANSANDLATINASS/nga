@@ -1,0 +1,1382 @@
+if not game:IsLoaded() then 
+    game.Loaded:Wait()
+end
+
+local TriggerBotSettings = {
+    -- Core Settings
+    Enabled = false,
+    ToggleKey = Enum.KeyCode.T,
+    Branding = "Sigma",
+
+    -- Multi-Hitbox Targeting Settings
+    SelectedHitboxes = {
+        Head = true,
+        Torso = false,
+        HumanoidRootPart = false,
+        UpperTorso = false,
+        LowerTorso = false,
+        LeftArm = false,
+        RightArm = false,
+        LeftLeg = false,
+        RightLeg = false
+    },
+    
+    -- Hitbox Priority for both trigger and aimlock
+    HitboxPriority = {
+        Head = 1,
+        UpperTorso = 2,
+        Torso = 3,
+        HumanoidRootPart = 4,
+        LowerTorso = 5,
+        LeftArm = 6,
+        RightArm = 7,
+        LeftLeg = 8,
+        RightLeg = 9
+    },
+    
+    -- Targeting Settings
+    TargetPart = "Head",
+    TeamCheck = true,
+    VisibleCheck = true,
+    HealthCheck = true,
+
+    -- Trigger Settings
+    TriggerDelay = 0.1,
+    HoldTime = 0.05,
+    RandomDelay = false,
+    MinRandomDelay = 0.05,
+    MaxRandomDelay = 0.2,
+
+    -- ESP Settings
+    ESPEnabled = false,
+    ESPBoxes = true,
+    ESPNames = true,
+    ESPDistance = true,
+    ESPHealth = true,
+    ESPTeamCheck = true,
+    ESPMaxDistance = 1000,
+
+    -- Raycast Settings
+    MaxDistance = 1000,
+    RaycastMethod = "Camera",
+    
+    -- Humanization
+    HitChance = 95,
+    MissOnPurpose = false,
+    
+    -- Safety Features
+    AntiKickback = true,
+    LastShotTime = 0,
+    MinShotInterval = 0.1,
+    
+    -- Visual Settings
+    ShowTarget = false,
+    TargetColor = Color3.fromRGB(255, 0, 0),
+    CrosshairVisible = false,
+    
+    -- Debug
+    DebugMode = false,
+
+    -- Aimlock Settings with persistence
+    AimlockEnabled = false,
+    AimlockToggleKey = Enum.KeyCode.E,
+    AimlockFOV = 360,
+    AimlockMaxRange = 1000,
+    AimlockSmoothing = 0.1,
+    AimlockInstantLock = true,
+    AimlockPersistentTarget = nil,
+    AimlockTargetLocked = false,
+
+    -- Add prediction settings
+    AimlockPrediction = false,
+    AimlockPredictionStrength = 0.15
+}
+
+-- Services and Global Variables
+getgenv().TriggerBotSettings = TriggerBotSettings
+local Camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+-- Storage
+local Connections = {}
+local CurrentAimlockTarget = nil
+local AimlockTargetPlayer = nil
+local LastTarget = nil
+local TriggerQueue = {}
+local ESPObjects = {}
+
+-- Visual Elements
+local target_indicator = Drawing.new("Circle")
+target_indicator.Thickness = 2
+target_indicator.NumSides = 12
+target_indicator.Radius = 8
+target_indicator.Filled = false
+target_indicator.Visible = false
+target_indicator.ZIndex = 999
+target_indicator.Color = Color3.fromRGB(255, 0, 0)
+
+local crosshair_h = Drawing.new("Line")
+crosshair_h.Thickness = 2
+crosshair_h.Color = Color3.fromRGB(255, 255, 255)
+crosshair_h.Visible = false
+crosshair_h.ZIndex = 999
+
+local crosshair_v = Drawing.new("Line")
+crosshair_v.Thickness = 2
+crosshair_v.Color = Color3.fromRGB(255, 255, 255)
+crosshair_v.Visible = false
+crosshair_v.ZIndex = 999
+
+local aimlock_indicator = Drawing.new("Circle")
+aimlock_indicator.Thickness = 4
+aimlock_indicator.NumSides = 20
+aimlock_indicator.Radius = 15
+aimlock_indicator.Filled = false
+aimlock_indicator.Visible = false
+aimlock_indicator.ZIndex = 1001
+aimlock_indicator.Color = Color3.fromRGB(255, 255, 255)
+
+-- Utility Functions
+local function DebugPrint(message)
+    if TriggerBotSettings.DebugMode then
+        print("[TriggerBot Debug]: " .. tostring(message))
+    end
+end
+
+local function GetDistance(pos1, pos2)
+    return (pos1 - pos2).Magnitude
+end
+
+local function IsValidTarget(player, aimlockMode)
+    if not player or player == LocalPlayer then return false end
+    
+    local character = player.Character
+    if not character then return false end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return false end
+    
+    if TriggerBotSettings.HealthCheck and humanoid.Health <= 0 then return false end
+    
+    if TriggerBotSettings.TeamCheck and player.Team == LocalPlayer.Team then return false end
+    
+    return true
+end
+
+local function IsPlayerVisible(targetPart, throughWalls, aimlockMode)
+    if not TriggerBotSettings.VisibleCheck then return true end
+    
+    local localCharacter = LocalPlayer.Character
+    if not localCharacter then return false end
+    
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit * 1000
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {localCharacter}
+    
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    
+    if result then
+        local hitCharacter = result.Instance.Parent
+        return hitCharacter == targetPart.Parent
+    end
+    
+    return false
+end
+
+local function GetValidBodyPart(character, partName)
+    if not character then return nil end
+    
+    local part = character:FindFirstChild(partName)
+    if part then return part end
+    
+    local alternativeNames = {
+        ["Left Arm"] = "LeftArm",
+        ["Right Arm"] = "RightArm", 
+        ["Left Leg"] = "LeftLeg",
+        ["Right Leg"] = "RightLeg"
+    }
+    
+    if alternativeNames[partName] then
+        part = character:FindFirstChild(alternativeNames[partName])
+        if part then return part end
+    end
+    
+    for alt, standard in pairs(alternativeNames) do
+        if standard == partName then
+            part = character:FindFirstChild(alt)
+            if part then return part end
+        end
+    end
+    
+    return nil
+end
+
+local function PickBestHitbox(player)
+    if not player or not player.Character then return nil end
+    
+    local character = player.Character
+    local bestPart = nil
+    local highestPriority = math.huge
+    
+    for hitboxName, selected in pairs(TriggerBotSettings.SelectedHitboxes) do
+        if selected then
+            local part = GetValidBodyPart(character, hitboxName)
+            if part then
+                local priority = TriggerBotSettings.HitboxPriority[hitboxName] or 999
+                if priority < highestPriority then
+                    highestPriority = priority
+                    bestPart = part
+                end
+            end
+        end
+    end
+    
+    if not bestPart then
+        bestPart = GetValidBodyPart(character, TriggerBotSettings.TargetPart)
+    end
+    
+    if not bestPart then
+        bestPart = character:FindFirstChild("Head")
+    end
+    
+    return bestPart
+end
+
+-- Aimlock Functions
+local function getClosestPlayerForAimlock()
+    -- If aimlock is disabled, always return nil
+    if not TriggerBotSettings.AimlockEnabled then
+        return nil, 0
+    end
+    
+    -- If we already have a locked target, ONLY check if it's dead or completely invalid
+    if TriggerBotSettings.AimlockTargetLocked and AimlockTargetPlayer then
+        if AimlockTargetPlayer.Character then
+            local humanoid = AimlockTargetPlayer.Character:FindFirstChild("Humanoid")
+            -- Only release if the player is dead or has no humanoid
+            if humanoid and humanoid.Health > 0 then
+                local targetPart = PickBestHitbox(AimlockTargetPlayer)
+                if targetPart then
+                    local localCharacter = LocalPlayer.Character
+                    if localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") then
+                        local distance = GetDistance(targetPart.Position, localCharacter.HumanoidRootPart.Position)
+                        DebugPrint("Maintaining lock on: " .. AimlockTargetPlayer.Name .. " (Health: " .. math.floor(humanoid.Health) .. ")")
+                        return AimlockTargetPlayer, distance
+                    end
+                end
+            end
+        end
+        
+        -- Only release if target is actually dead or character is gone
+        DebugPrint("Target is dead or invalid, releasing: " .. (AimlockTargetPlayer and AimlockTargetPlayer.Name or "Unknown"))
+        AimlockTargetPlayer = nil
+        TriggerBotSettings.AimlockTargetLocked = false
+    end
+    
+    -- Only search for new targets if we don't have one locked
+    if not TriggerBotSettings.AimlockTargetLocked then
+        local closestPlayer = nil
+        local shortestDistance = math.huge
+        local localCharacter = LocalPlayer.Character
+        if not localCharacter or not localCharacter:FindFirstChild("HumanoidRootPart") then
+            return nil, 0
+        end
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and IsValidTarget(player, true) then
+                if TriggerBotSettings.TeamCheck and player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then
+                    continue
+                end
+                
+                local targetPart = PickBestHitbox(player)
+                if targetPart then
+                    local distance = GetDistance(targetPart.Position, localCharacter.HumanoidRootPart.Position)
+                    if distance <= TriggerBotSettings.AimlockMaxRange then
+                        local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                        if onScreen then
+                            local viewportSize = Camera.ViewportSize
+                            local distanceFromCenter = (Vector2.new(screenPoint.X, screenPoint.Y) - Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)).Magnitude
+                            
+                            if distanceFromCenter <= TriggerBotSettings.AimlockFOV / 2 then
+                                local isVisible = true
+                                if TriggerBotSettings.VisibleCheck then
+                                    isVisible = IsPlayerVisible(targetPart, false, true)
+                                end
+                                
+                                if isVisible then
+                                    if distance < shortestDistance then
+                                        shortestDistance = distance
+                                        closestPlayer = player
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        if closestPlayer then
+            AimlockTargetPlayer = closestPlayer
+            TriggerBotSettings.AimlockTargetLocked = true
+            DebugPrint("Locked onto new target: " .. closestPlayer.Name .. " at distance: " .. math.floor(shortestDistance))
+            return closestPlayer, shortestDistance
+        end
+    end
+    
+    return nil, 0
+end
+
+local function UpdateAimlock()
+    if not TriggerBotSettings.AimlockEnabled then
+        -- Clear any existing target when aimlock is disabled
+        if AimlockTargetPlayer then
+            AimlockTargetPlayer = nil
+            TriggerBotSettings.AimlockTargetLocked = false
+        end
+        return
+    end
+    
+    local closestPlayer, shortestDistance = getClosestPlayerForAimlock()
+    
+    if closestPlayer and closestPlayer.Character then
+        local targetPart = PickBestHitbox(closestPlayer)
+        if targetPart then
+            local targetPosition = targetPart.Position
+            
+            -- Add prediction if enabled
+            if TriggerBotSettings.AimlockPrediction then
+                local humanoidRootPart = closestPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    local velocity = humanoidRootPart.Velocity
+                    local distance = GetDistance(Camera.CFrame.Position, targetPosition)
+                    local timeToReach = distance / 1000 -- Estimated time to reach target
+                    targetPosition = targetPosition + (velocity * TriggerBotSettings.AimlockPredictionStrength * timeToReach)
+                end
+            end
+            
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, targetPosition)
+            
+            if TriggerBotSettings.AimlockInstantLock then
+                Camera.CFrame = targetCFrame
+            else
+                Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, TriggerBotSettings.AimlockSmoothing)
+            end
+            
+            if tick() % 2 < 0.1 then
+                DebugPrint("Aimlocking to: " .. closestPlayer.Name .. " at distance: " .. math.floor(shortestDistance))
+            end
+        end
+    end
+end
+
+-- Trigger Bot Functions
+local function GetTargetUnderCrosshair()
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local unitRay
+    
+    if TriggerBotSettings.RaycastMethod == "Camera" then
+        unitRay = Camera:ScreenPointToRay(screenCenter.X, screenCenter.Y)
+    else
+        unitRay = Camera:ScreenPointToRay(Mouse.X, Mouse.Y)
+    end
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    
+    local result = workspace:Raycast(unitRay.Origin, unitRay.Direction * TriggerBotSettings.MaxDistance, raycastParams)
+    
+    if result then
+        local hitPart = result.Instance
+        local hitCharacter = hitPart.Parent
+        
+        local player = Players:GetPlayerFromCharacter(hitCharacter)
+        if player and IsValidTarget(player, false) then
+            local targetFound = false
+            local finalTargetPart = nil
+            local hitboxName = nil
+            
+            local singleTargetPart = GetValidBodyPart(hitCharacter, TriggerBotSettings.TargetPart)
+            if singleTargetPart and (hitPart == singleTargetPart or hitPart.Parent == singleTargetPart or hitPart:IsDescendantOf(singleTargetPart)) then
+                if IsPlayerVisible(singleTargetPart, false, false) then
+                    finalTargetPart = singleTargetPart
+                    hitboxName = TriggerBotSettings.TargetPart
+                    targetFound = true
+                end
+            end
+            
+            if not targetFound then
+                for hitboxName_multi, selected in pairs(TriggerBotSettings.SelectedHitboxes) do
+                    if selected then
+                        local multiTargetPart = GetValidBodyPart(hitCharacter, hitboxName_multi)
+                        if multiTargetPart and (hitPart == multiTargetPart or hitPart.Parent == multiTargetPart or hitPart:IsDescendantOf(multiTargetPart)) then
+                            if IsPlayerVisible(multiTargetPart, false, false) then
+                                finalTargetPart = multiTargetPart
+                                hitboxName = hitboxName_multi
+                                targetFound = true
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+            
+            if targetFound then
+                return player, finalTargetPart, result.Position, hitboxName
+            end
+        end
+    end
+    
+    return nil, nil, nil, nil
+end
+
+local function CalculateHitChance()
+    return math.random(1, 100) <= TriggerBotSettings.HitChance
+end
+
+local function GetRandomDelay()
+    if TriggerBotSettings.RandomDelay then
+        return math.random() * (TriggerBotSettings.MaxRandomDelay - TriggerBotSettings.MinRandomDelay) + TriggerBotSettings.MinRandomDelay
+    end
+    return TriggerBotSettings.TriggerDelay
+end
+
+local function CanShoot()
+    local currentTime = tick()
+    return currentTime - TriggerBotSettings.LastShotTime >= TriggerBotSettings.MinShotInterval
+end
+
+local function FireWeapon()
+    if not CanShoot() then return end
+    
+    TriggerBotSettings.LastShotTime = tick()
+    
+    local success = false
+    
+    if not success then
+        success = pcall(function()
+            mouse1press()
+            task.wait(TriggerBotSettings.HoldTime)
+            mouse1release()
+            DebugPrint("Fired using mouse1press/release")
+            return true
+        end)
+    end
+    
+    if not success then
+        success = pcall(function()
+            mouse1click()
+            DebugPrint("Fired using mouse1click")
+            return true
+        end)
+    end
+    
+    if success then
+        DebugPrint("Weapon fired successfully")
+    else
+        DebugPrint("Failed to fire weapon")
+    end
+end
+
+local function TriggerShot(player, targetPart, hitPosition, hitboxName)
+    if not CalculateHitChance() then
+        DebugPrint("Shot missed due to hit chance")
+        return
+    end
+    
+    if TriggerBotSettings.MissOnPurpose and math.random(1, 20) == 1 then
+        DebugPrint("Intentionally missed shot")
+        return
+    end
+    
+    local delay = GetRandomDelay()
+    
+    table.insert(TriggerQueue, {
+        player = player,
+        part = targetPart,
+        position = hitPosition,
+        hitbox = hitboxName or "Unknown",
+        time = tick() + delay
+    })
+    
+    DebugPrint("Queued shot for " .. player.Name .. " (" .. (hitboxName or "Unknown") .. ") with delay " .. delay)
+end
+
+local function UpdateTriggerBot()
+    if not TriggerBotSettings.Enabled then 
+        return 
+    end
+    
+    local player, targetPart, hitPosition, hitboxName = GetTargetUnderCrosshair()
+    
+    if player and targetPart then
+        if TriggerBotSettings.ShowTarget then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(hitPosition)
+            if onScreen then
+                target_indicator.Position = Vector2.new(screenPos.X, screenPos.Y)
+                target_indicator.Visible = true
+                target_indicator.Color = TriggerBotSettings.TargetColor
+            else
+                target_indicator.Visible = false
+            end
+        end
+        
+        if LastTarget ~= player or CanShoot() then
+            TriggerShot(player, targetPart, hitPosition, hitboxName)
+            LastTarget = player
+        end
+    else
+        target_indicator.Visible = false
+        LastTarget = nil
+    end
+    
+    local currentTime = tick()
+    for i = #TriggerQueue, 1, -1 do
+        local shot = TriggerQueue[i]
+        if currentTime >= shot.time then
+            FireWeapon()
+            table.remove(TriggerQueue, i)
+        end
+    end
+end
+
+-- ESP Functions
+local function CreateESP(player)
+    local esp = {
+        Box = Drawing.new("Square"),
+        Name = Drawing.new("Text"),
+        Distance = Drawing.new("Text"),
+        Health = Drawing.new("Text"),
+        Player = player
+    }
+    
+    esp.Box.Thickness = 2
+    esp.Box.Filled = false
+    esp.Box.Color = Color3.fromRGB(255, 255, 255)
+    esp.Box.Visible = false
+    esp.Box.ZIndex = 2
+    
+    esp.Name.Text = player.Name
+    esp.Name.Size = 16
+    esp.Name.Center = true
+    esp.Name.Outline = true
+    esp.Name.OutlineColor = Color3.fromRGB(0, 0, 0)
+    esp.Name.Color = Color3.fromRGB(255, 255, 255)
+    esp.Name.Visible = false
+    esp.Name.ZIndex = 2
+    
+    esp.Distance.Text = ""
+    esp.Distance.Size = 14
+    esp.Distance.Center = true
+    esp.Distance.Outline = true
+    esp.Distance.OutlineColor = Color3.fromRGB(0, 0, 0)
+    esp.Distance.Color = Color3.fromRGB(255, 255, 0)
+    esp.Distance.Visible = false
+    esp.Distance.ZIndex = 2
+    
+    esp.Health.Text = ""
+    esp.Health.Size = 14
+    esp.Health.Center = true
+    esp.Health.Outline = true
+    esp.Health.OutlineColor = Color3.fromRGB(0, 0, 0)
+    esp.Health.Color = Color3.fromRGB(255, 255, 255)
+    esp.Health.Visible = false
+    esp.Health.ZIndex = 2
+    
+    ESPObjects[player] = esp
+end
+
+local function RemoveESP(player)
+    local esp = ESPObjects[player]
+    if esp then
+        esp.Box:Remove()
+        esp.Name:Remove()
+        esp.Distance:Remove()
+        esp.Health:Remove()
+        ESPObjects[player] = nil
+    end
+end
+
+local function UpdateESP()
+    if not TriggerBotSettings.ESPEnabled then
+        for _, esp in pairs(ESPObjects) do
+            esp.Box.Visible = false
+            esp.Name.Visible = false
+            esp.Distance.Visible = false
+            esp.Health.Visible = false
+        end
+        return
+    end
+    
+    local localCharacter = LocalPlayer.Character
+    local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+    
+    for player, esp in pairs(ESPObjects) do
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+            local humanoid = player.Character.Humanoid
+            local rootPart = player.Character.HumanoidRootPart
+            
+            if humanoid.Health > 0 then
+                if TriggerBotSettings.ESPTeamCheck and player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then
+                    esp.Box.Visible = false
+                    esp.Name.Visible = false
+                    esp.Distance.Visible = false
+                    esp.Health.Visible = false
+                    continue
+                end
+                
+                local distance = 0
+                if localRoot then
+                    distance = GetDistance(rootPart.Position, localRoot.Position)
+                    if distance > TriggerBotSettings.ESPMaxDistance then
+                        esp.Box.Visible = false
+                        esp.Name.Visible = false
+                        esp.Distance.Visible = false
+                        esp.Health.Visible = false
+                        continue
+                    end
+                end
+                
+                local vector, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                
+                if onScreen then
+                    local head = player.Character:FindFirstChild("Head")
+                    if head then
+                        local headVector = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                        local legVector = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
+                        
+                        local healthPercent = humanoid.Health / humanoid.MaxHealth
+                        local color = Color3.fromRGB(
+                            math.floor(255 * (1 - healthPercent)),
+                            math.floor(255 * healthPercent),
+                            0
+                        )
+                        
+                        if TriggerBotSettings.ESPBoxes then
+                            esp.Box.Size = Vector2.new(1000 / vector.Z, headVector.Y - legVector.Y)
+                            esp.Box.Position = Vector2.new(vector.X - esp.Box.Size.X / 2, legVector.Y)
+                            esp.Box.Color = color
+                            esp.Box.Visible = true
+                        else
+                            esp.Box.Visible = false
+                        end
+                        
+                        if TriggerBotSettings.ESPNames then
+                            esp.Name.Position = Vector2.new(vector.X, headVector.Y - 30)
+                            esp.Name.Color = color
+                            esp.Name.Visible = true
+                        else
+                            esp.Name.Visible = false
+                        end
+                        
+                        if TriggerBotSettings.ESPDistance then
+                            esp.Distance.Text = math.floor(distance) .. " studs"
+                            esp.Distance.Position = Vector2.new(vector.X, legVector.Y + 20)
+                            esp.Distance.Visible = true
+                        else
+                            esp.Distance.Visible = false
+                        end
+                        
+                        if TriggerBotSettings.ESPHealth then
+                            esp.Health.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
+                            esp.Health.Position = Vector2.new(vector.X, legVector.Y + 35)
+                            esp.Health.Color = color
+                            esp.Health.Visible = true
+                        else
+                            esp.Health.Visible = false
+                        end
+                    end
+                else
+                    esp.Box.Visible = false
+                    esp.Name.Visible = false
+                    esp.Distance.Visible = false
+                    esp.Health.Visible = false
+                end
+            else
+                esp.Box.Visible = false
+                esp.Name.Visible = false
+                esp.Distance.Visible = false
+                esp.Health.Visible = false
+            end
+        else
+            esp.Box.Visible = false
+            esp.Name.Visible = false
+            esp.Distance.Visible = false
+            esp.Health.Visible = false
+        end
+    end
+end
+
+local function UpdateCrosshair()
+    if TriggerBotSettings.CrosshairVisible then
+        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        
+        crosshair_h.From = Vector2.new(center.X - 10, center.Y)
+        crosshair_h.To = Vector2.new(center.X + 10, center.Y)
+        crosshair_h.Visible = true
+        
+        crosshair_v.From = Vector2.new(center.X, center.Y - 10)
+        crosshair_v.To = Vector2.new(center.X, center.Y + 10)
+        crosshair_v.Visible = true
+    else
+        crosshair_h.Visible = false
+        crosshair_v.Visible = false
+    end
+end
+
+-- Initialize Tokyo Library
+local Decimals = 4
+local Clock = os.clock()
+
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/drillygzzly/Roblox-UI-Libs/main/1%20Tokyo%20Lib%20(FIXED)/Tokyo%20Lib%20Source.lua"))({
+    cheatname = "Crazy Hub", 
+    gamename = "Gamesense", 
+})
+
+library:init()
+
+local Window = library.NewWindow({
+    title = "Crazy Hub | ENTRENCHED WW1", 
+    size = UDim2.new(0, 600, 0.7, 0)
+})
+
+-- Create Tabs
+local MainTab = Window:AddTab("  Main  ")
+local AimlockTab = Window:AddTab("  Aimlock  ")
+local ESPTab = Window:AddTab("  ESP  ")
+local SettingsTab = library:CreateSettingsTab(Window)
+
+-- Discord Integration Functions
+local function copyToClipboard(text)
+    local success, result = pcall(function()
+        if setclipboard then
+            setclipboard(text)
+            return true
+        elseif toclipboard then
+            toclipboard(text)
+            return true
+        else
+            return false
+        end
+    end)
+    return success
+end
+
+local function openDiscordInvite(inviteUrl)
+    local success = pcall(function()
+        if syn and syn.request then
+            syn.request({
+                Url = inviteUrl,
+                Method = "GET"
+            })
+        elseif request then
+            request({
+                Url = inviteUrl,
+                Method = "GET"
+            })
+        end
+    end)
+    return success
+end
+
+local function handleDiscordInvite()
+    local discordInvite = "https://discord.gg/MrgrqUYfx6"
+    
+    -- Copy to clipboard
+    local clipboardSuccess = copyToClipboard(discordInvite)
+    
+    -- Try to open Discord
+    local openSuccess = openDiscordInvite(discordInvite)
+    
+    -- Send notification
+    if clipboardSuccess then
+        library:SendNotification("Discord invite copied to clipboard!", 4)
+    else
+        library:SendNotification("Discord: https://discord.gg/MrgrqUYfx6", 6)
+    end
+    
+    DebugPrint("Discord invite handled - Clipboard: " .. tostring(clipboardSuccess) .. ", Open: " .. tostring(openSuccess))
+end
+
+-- Add Discord button to Settings tab
+local DiscordSection = SettingsTab:AddSection("Community", 1)
+
+DiscordSection:AddButton({
+    enabled = true,
+    text = "Join Discord Server",
+    tooltip = "Join our Discord community for updates and support",
+    callback = function()
+        handleDiscordInvite()
+    end
+})
+
+DiscordSection:AddSeparator({
+    enabled = true,
+    text = "Support & Updates"
+})
+
+-- Main Tab
+local CoreSection = MainTab:AddSection("Core Settings", 1)
+
+local TriggerToggle = CoreSection:AddToggle({
+    text = "Enable TriggerBot",
+    state = TriggerBotSettings.Enabled,
+    tooltip = "Enable/Disable the main triggerbot functionality",
+    flag = "TriggerEnabled",
+    callback = function(value)
+        TriggerBotSettings.Enabled = value
+        DebugPrint("TriggerBot " .. (value and "Enabled" or "Disabled"))
+    end
+})
+
+TriggerToggle:AddBind({
+    enabled = true,
+    text = "Toggle Key",
+    tooltip = "Keybind to toggle triggerbot",
+    mode = "toggle",
+    bind = "T",
+    flag = "TriggerToggleKey",
+    callback = function()
+        TriggerBotSettings.Enabled = not TriggerBotSettings.Enabled
+        -- Update UI toggle state
+        pcall(function()
+            TriggerToggle:Set(TriggerBotSettings.Enabled)
+        end)
+        DebugPrint("TriggerBot toggled: " .. tostring(TriggerBotSettings.Enabled))
+    end
+})
+
+CoreSection:AddList({
+    enabled = true,
+    text = "Primary Target Part", 
+    tooltip = "Select the primary body part to target",
+    selected = TriggerBotSettings.TargetPart,
+    flag = "TargetPart",
+    values = {"Head", "Torso", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"},
+    callback = function(value)
+        TriggerBotSettings.TargetPart = value
+        DebugPrint("Primary target part changed to: " .. value)
+    end
+})
+
+-- Function to get selected hitboxes as string
+local function getSelectedHitboxesString()
+    local selected = {}
+    for hitboxName, isSelected in pairs(TriggerBotSettings.SelectedHitboxes) do
+        if isSelected then
+            table.insert(selected, hitboxName)
+        end
+    end
+    return #selected > 0 and table.concat(selected, ", ") or "None"
+end
+
+CoreSection:AddList({
+    enabled = true,
+    text = "Multi-Hitbox Selection",
+    tooltip = "Select multiple hitboxes to target (priority based)",
+    selected = "Head",
+    flag = "MultiHitbox",
+    values = {"Head", "UpperTorso", "Torso", "HumanoidRootPart", "LowerTorso", "LeftArm", "RightArm", "LeftLeg", "RightLeg", "All Hitboxes", "Head Only"},
+    callback = function(value)
+        if value == "All Hitboxes" then
+            for hitboxName, _ in pairs(TriggerBotSettings.SelectedHitboxes) do
+                TriggerBotSettings.SelectedHitboxes[hitboxName] = true
+            end
+        elseif value == "Head Only" then
+            for hitboxName, _ in pairs(TriggerBotSettings.SelectedHitboxes) do
+                TriggerBotSettings.SelectedHitboxes[hitboxName] = false
+            end
+            TriggerBotSettings.SelectedHitboxes.Head = true
+        else
+            -- Toggle individual hitbox
+            TriggerBotSettings.SelectedHitboxes[value] = not TriggerBotSettings.SelectedHitboxes[value]
+        end
+        DebugPrint("Multi-hitbox selection updated: " .. getSelectedHitboxesString())
+    end
+})
+
+-- Initialize slider default values
+CoreSection:AddSlider({
+    enabled = true,
+    text = "Trigger Delay",
+    tooltip = "Delay before firing (seconds)",
+    flag = "TriggerDelay",
+    min = 0,
+    max = 1,
+    increment = 0.001,
+    suffix = "s",
+    value = TriggerBotSettings.TriggerDelay,
+    callback = function(value)
+        TriggerBotSettings.TriggerDelay = value
+    end
+})
+
+CoreSection:AddSlider({
+    enabled = true,
+    text = "Hold Time",
+    tooltip = "How long to hold the trigger (seconds)",
+    flag = "HoldTime",
+    min = 0.01,
+    max = 0.5,
+    increment = 0.001,
+    suffix = "s",
+    value = TriggerBotSettings.HoldTime,
+    callback = function(value)
+        TriggerBotSettings.HoldTime = value
+    end
+})
+
+-- Targeting Section
+local TargetingSection = MainTab:AddSection("Targeting Options", 2)
+
+TargetingSection:AddToggle({
+    text = "Team Check",
+    state = TriggerBotSettings.TeamCheck,
+    tooltip = "Don't target teammates",
+    flag = "TeamCheck",
+    callback = function(value)
+        TriggerBotSettings.TeamCheck = value
+    end
+})
+
+TargetingSection:AddToggle({
+    text = "Visible Check",
+    state = TriggerBotSettings.VisibleCheck,
+    tooltip = "Only target visible players",
+    flag = "VisibleCheck",
+    callback = function(value)
+        TriggerBotSettings.VisibleCheck = value
+    end
+})
+
+TargetingSection:AddToggle({
+    text = "Health Check",
+    state = TriggerBotSettings.HealthCheck,
+    tooltip = "Don't target dead players",
+    flag = "HealthCheck",
+    callback = function(value)
+        TriggerBotSettings.HealthCheck = value
+    end
+})
+
+TargetingSection:AddSlider({
+    enabled = true,
+    text = "Max Distance",
+    tooltip = "Maximum targeting distance",
+    flag = "MaxDistance",
+    min = 100,
+    max = 5000,
+    increment = 50,
+    suffix = " studs",
+    value = TriggerBotSettings.MaxDistance,
+    callback = function(value)
+        TriggerBotSettings.MaxDistance = value
+    end
+})
+
+TargetingSection:AddList({
+    enabled = true,
+    text = "Raycast Method", 
+    tooltip = "Method for detecting targets",
+    selected = TriggerBotSettings.RaycastMethod,
+    flag = "RaycastMethod",
+    values = {"Camera", "Mouse"},
+    callback = function(value)
+        TriggerBotSettings.RaycastMethod = value
+    end
+})
+
+-- Aimlock Tab
+local AimlockSection = AimlockTab:AddSection("Aimlock Settings", 1)
+
+local AimlockToggle = AimlockSection:AddToggle({
+    text = "Enable Aimlock",
+    state = TriggerBotSettings.AimlockEnabled,
+    tooltip = "Enable persistent target locking",
+    flag = "AimlockEnabled",
+    callback = function(value)
+        TriggerBotSettings.AimlockEnabled = value
+        if not value then
+            AimlockTargetPlayer = nil
+            TriggerBotSettings.AimlockTargetLocked = false
+        end
+        DebugPrint("Aimlock " .. (value and "Enabled" or "Disabled"))
+    end
+})
+
+AimlockToggle:AddBind({
+    enabled = true,
+    text = "Aimlock Key",
+    tooltip = "Toggle aimlock on/off",
+    mode = "toggle",
+    bind = "E",
+    flag = "AimlockToggleKey",
+    callback = function()
+        -- Simple toggle - flip the state
+        TriggerBotSettings.AimlockEnabled = not TriggerBotSettings.AimlockEnabled
+        
+        -- Always clear targets when toggling
+        AimlockTargetPlayer = nil
+        TriggerBotSettings.AimlockTargetLocked = false
+        
+        -- Update UI toggle state
+        pcall(function()
+            AimlockToggle:Set(TriggerBotSettings.AimlockEnabled)
+        end)
+        
+        if TriggerBotSettings.AimlockEnabled then
+            DebugPrint("Aimlock enabled - searching for target")
+        else
+            DebugPrint("Aimlock disabled and target released")
+        end
+    end
+})
+
+AimlockSection:AddSlider({
+    enabled = true,
+    text = "Aimlock FOV",
+    tooltip = "Field of view for aimlock targeting",
+    flag = "AimlockFOV",
+    min = 50,
+    max = 360,
+    increment = 1,
+    suffix = "°",
+    value = TriggerBotSettings.AimlockFOV,
+    callback = function(value)
+        TriggerBotSettings.AimlockFOV = value
+    end
+})
+
+AimlockSection:AddSlider({
+    enabled = true,
+    text = "Max Range",
+    tooltip = "Maximum range for aimlock",
+    flag = "AimlockMaxRange",
+    min = 100,
+    max = 5000,
+    increment = 10,
+    suffix = " studs",
+    value = TriggerBotSettings.AimlockMaxRange,
+    callback = function(value)
+        TriggerBotSettings.AimlockMaxRange = value
+    end
+})
+
+AimlockSection:AddToggle({
+    text = "Instant Lock",
+    state = TriggerBotSettings.AimlockInstantLock,
+    tooltip = "Instant camera lock vs smooth transition",
+    flag = "AimlockInstantLock",
+    callback = function(value)
+        TriggerBotSettings.AimlockInstantLock = value
+    end
+})
+
+AimlockSection:AddSlider({
+    enabled = true,
+    text = "Smoothing",
+    tooltip = "Camera smoothing when instant lock is disabled",
+    flag = "AimlockSmoothing",
+    min = 0.01,
+    max = 1,
+    increment = 0.01,
+    value = TriggerBotSettings.AimlockSmoothing,
+    callback = function(value)
+        TriggerBotSettings.AimlockSmoothing = value
+    end
+})
+
+AimlockSection:AddToggle({
+    text = "Movement Prediction",
+    state = TriggerBotSettings.AimlockPrediction,
+    tooltip = "Predict target movement for better accuracy",
+    flag = "AimlockPrediction",
+    callback = function(value)
+        TriggerBotSettings.AimlockPrediction = value
+    end
+})
+
+AimlockSection:AddSlider({
+    enabled = true,
+    text = "Prediction Strength",
+    tooltip = "How much to predict target movement",
+    flag = "AimlockPredictionStrength",
+    min = 0,
+    max = 1,
+    increment = 0.01,
+    value = TriggerBotSettings.AimlockPredictionStrength,
+    callback = function(value)
+        TriggerBotSettings.AimlockPredictionStrength = value
+    end
+})
+
+AimlockSection:AddButton({
+    enabled = true,
+    text = "Release Current Target",
+    tooltip = "Manually release the current aimlock target",
+    callback = function()
+        if AimlockTargetPlayer then
+            DebugPrint("Manually releasing target: " .. AimlockTargetPlayer.Name)
+            AimlockTargetPlayer = nil
+            TriggerBotSettings.AimlockTargetLocked = false
+        else
+            DebugPrint("No target to release")
+        end
+    end
+})
+
+-- Advanced Section (moved from Advanced tab)
+local AdvancedSection = AimlockTab:AddSection("Humanization & Advanced", 2)
+
+AdvancedSection:AddSlider({
+    enabled = true,
+    text = "Hit Chance",
+    tooltip = "Percentage chance to hit",
+    flag = "HitChance",
+    min = 1,
+    max = 100,
+    increment = 1,
+    suffix = "%",
+    value = TriggerBotSettings.HitChance,
+    callback = function(value)
+        TriggerBotSettings.HitChance = value
+    end
+})
+
+AdvancedSection:AddToggle({
+    text = "Random Delay",
+    state = TriggerBotSettings.RandomDelay,
+    tooltip = "Use random delays between shots",
+    flag = "RandomDelay",
+    callback = function(value)
+        TriggerBotSettings.RandomDelay = value
+    end
+})
+
+AdvancedSection:AddSlider({
+    enabled = true,
+    text = "Min Random Delay",
+    tooltip = "Minimum random delay",
+    flag = "MinRandomDelay",
+    min = 0.01,
+    max = 0.5,
+    increment = 0.001,
+    suffix = "s",
+    value = TriggerBotSettings.MinRandomDelay,
+    callback = function(value)
+        TriggerBotSettings.MinRandomDelay = value
+    end
+})
+
+AdvancedSection:AddSlider({
+    enabled = true,
+    text = "Max Random Delay",
+    tooltip = "Maximum random delay",
+    flag = "MaxRandomDelay",
+    min = 0.1,
+    max = 1,
+    increment = 0.001,
+    suffix = "s",
+    value = TriggerBotSettings.MaxRandomDelay,
+    callback = function(value)
+        TriggerBotSettings.MaxRandomDelay = value
+    end
+})
+
+AdvancedSection:AddSeparator({
+    enabled = true,
+    text = "Visual Options"
+})
+
+AdvancedSection:AddToggle({
+    text = "Occasional Miss",
+    state = TriggerBotSettings.MissOnPurpose,
+    tooltip = "Occasionally miss on purpose",
+    flag = "MissOnPurpose",
+    callback = function(value)
+        TriggerBotSettings.MissOnPurpose = value
+    end
+})
+
+AdvancedSection:AddToggle({
+    text = "Show Target Indicator",
+    state = TriggerBotSettings.ShowTarget,
+    tooltip = "Show visual indicator on current target",
+    flag = "ShowTarget",
+    callback = function(value)
+        TriggerBotSettings.ShowTarget = value
+        if not value then
+            target_indicator.Visible = false
+        end
+    end
+})
+
+AdvancedSection:AddToggle({
+    text = "Show Crosshair",
+    state = TriggerBotSettings.CrosshairVisible,
+    tooltip = "Show custom crosshair",
+    flag = "CrosshairVisible",
+    callback = function(value)
+        TriggerBotSettings.CrosshairVisible = value
+    end
+})
+
+AdvancedSection:AddToggle({
+    text = "Debug Mode",
+    state = TriggerBotSettings.DebugMode,
+    tooltip = "Enable debug console output",
+    flag = "DebugMode",
+    callback = function(value)
+        TriggerBotSettings.DebugMode = value
+    end
+})
+
+AdvancedSection:AddColor({
+    enabled = true,
+    text = "Target Color",
+    tooltip = "Color of the target indicator",
+    color = TriggerBotSettings.TargetColor,
+    flag = "TargetColor",
+    callback = function(value)
+        TriggerBotSettings.TargetColor = value
+        target_indicator.Color = value
+    end
+})
+
+-- ESP Tab
+local ESPSection = ESPTab:AddSection("ESP Settings", 1)
+
+ESPSection:AddToggle({
+    text = "Enable ESP",
+    state = TriggerBotSettings.ESPEnabled,
+    tooltip = "Enable player ESP",
+    flag = "ESPEnabled",
+    callback = function(value)
+        TriggerBotSettings.ESPEnabled = value
+    end
+})
+
+ESPSection:AddToggle({
+    text = "Show Boxes",
+    state = TriggerBotSettings.ESPBoxes,
+    tooltip = "Show ESP boxes around players",
+    flag = "ESPBoxes",
+    callback = function(value)
+        TriggerBotSettings.ESPBoxes = value
+    end
+})
+
+ESPSection:AddToggle({
+    text = "Show Names",
+    state = TriggerBotSettings.ESPNames,
+    tooltip = "Show player names",
+    flag = "ESPNames",
+    callback = function(value)
+        TriggerBotSettings.ESPNames = value
+    end
+})
+
+ESPSection:AddToggle({
+    text = "Show Distance",
+    state = TriggerBotSettings.ESPDistance,
+    tooltip = "Show distance to players",
+    flag = "ESPDistance",
+    callback = function(value)
+        TriggerBotSettings.ESPDistance = value
+    end
+})
+
+ESPSection:AddToggle({
+    text = "Show Health",
+    state = TriggerBotSettings.ESPHealth,
+    tooltip = "Show player health",
+    flag = "ESPHealth",
+    callback = function(value)
+        TriggerBotSettings.ESPHealth = value
+    end
+})
+
+ESPSection:AddToggle({
+    text = "Hide Teammates",
+    state = TriggerBotSettings.ESPTeamCheck,
+    tooltip = "Don't show ESP for teammates",
+    flag = "ESPTeamCheck",
+    callback = function(value)
+        TriggerBotSettings.ESPTeamCheck = value
+    end
+})
+
+ESPSection:AddSlider({
+    enabled = true,
+    text = "ESP Max Distance",
+    tooltip = "Maximum distance to show ESP",
+    flag = "ESPMaxDistance",
+    min = 100,
+    max = 5000,
+    increment = 50,
+    suffix = " studs",
+    callback = function(value)
+        TriggerBotSettings.ESPMaxDistance = value
+    end
+})
+
+-- Main update loop
+Connections.MainLoop = RunService.Heartbeat:Connect(function()
+    UpdateTriggerBot()
+    UpdateESP()
+    UpdateCrosshair()
+    UpdateAimlock()
+end)
+
+-- ESP Player Management
+Players.PlayerAdded:Connect(function(player)
+    CreateESP(player)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    RemoveESP(player)
+end)
+
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        CreateESP(player)
+    end
+end
+
+-- Cleanup
+game.Players.PlayerRemoving:Connect(function(player)
+    if player == LocalPlayer then
+        for _, connection in pairs(Connections) do
+            if connection then
+                connection:Disconnect()
+            end
+        end
+        
+        target_indicator:Remove()
+        crosshair_h:Remove()
+        crosshair_v:Remove()
+        aimlock_indicator:Remove()
+        
+        for _, esp in pairs(ESPObjects) do
+            RemoveESP(esp.Player)
+        end
+    end
+end)
+
+-- Load notification
+local Time = (string.format("%."..tostring(Decimals).."f", os.clock() - Clock))
+library:SendNotification(("Crazy Hub Loaded In "..tostring(Time).." seconds"), 6)
+
+DebugPrint("Crazy Hub TriggerBot with Tokyo UI loaded successfully!")

@@ -1,0 +1,5 @@
+repeat
+    task.wait()
+until game:IsLoaded() and game:GetService("Players").LocalPlayer
+script_key="QcWHwnGwRaetOWdZKOTcJEzSufhJCPZe";
+loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/4dde03488cd14713360bc4d9210ad7a1.lua"))()

@@ -1,0 +1,2400 @@
+-- Murim Cultivation - BOSS DETECTION FIXED V2.1 COMPLETE
+-- Updated: 2025-07-03 10:39:41
+-- FIXED: String/Number comparison errors
+-- FIXED: Enhanced type validation for health checks
+-- FIXED: Better error handling for all numeric operations
+-- COMPLETE: All original functionality included
+
+print("🔥 Loading Murim Cultivation with Enhanced Boss Detection V2.1 COMPLETE...")
+
+-- Services with error handling
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local StarterPlayer = game:GetService("StarterPlayer")
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+
+-- Player setup with validation
+local player = Players.LocalPlayer
+if not player then
+    error("Player not found!")
+    return
+end
+
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- IMPROVED TYPE VALIDATION FUNCTIONS
+local function isValidNumber(value)
+    return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
+local function toSafeNumber(value, defaultValue)
+    defaultValue = defaultValue or 0
+    
+    if type(value) == "number" then
+        if value == value and value ~= math.huge and value ~= -math.huge then
+            return value
+        else
+            return defaultValue
+        end
+    elseif type(value) == "string" then
+        local num = tonumber(value)
+        if num and isValidNumber(num) then
+            return num
+        else
+            return defaultValue
+        end
+    else
+        return defaultValue
+    end
+end
+
+local function safeCompare(a, b, operator)
+    local numA = toSafeNumber(a, 0)
+    local numB = toSafeNumber(b, 0)
+    
+    if operator == "<=" then
+        return numA <= numB
+    elseif operator == ">=" then
+        return numA >= numB
+    elseif operator == "<" then
+        return numA < numB
+    elseif operator == ">" then
+        return numA > numB
+    elseif operator == "==" then
+        return numA == numB
+    else
+        return false
+    end
+end
+
+-- SAFE HEALTH RETRIEVAL FUNCTIONS
+local function getHealthSafely(humanoid)
+    if not humanoid then
+        return 0, 0
+    end
+    
+    local success, health, maxHealth = pcall(function()
+        local h = humanoid.Health
+        local mh = humanoid.MaxHealth
+        return toSafeNumber(h, 0), toSafeNumber(mh, 100)
+    end)
+    
+    if success then
+        return health, maxHealth
+    else
+        return 0, 100
+    end
+end
+
+local function getHealthPercentage(humanoid)
+    local health, maxHealth = getHealthSafely(humanoid)
+    
+    if maxHealth <= 0 then
+        return 0
+    end
+    
+    return (health / maxHealth) * 100
+end
+
+-- IMPROVED SAFE HEALTH CHECK
+local function safeHealthCheck(health, threshold)
+    local healthNum = toSafeNumber(health, 0)
+    local thresholdNum = toSafeNumber(threshold, 0)
+    
+    return safeCompare(healthNum, thresholdNum, "<=")
+end
+
+-- Safe service loading
+local function safeGetService(serviceName)
+    local success, service = pcall(function()
+        return game:GetService(serviceName)
+    end)
+    if success then
+        return service
+    else
+        warn("Failed to get service: " .. serviceName)
+        return nil
+    end
+end
+
+-- Safe remote reference
+local function getRemoteEvents()
+    local success, events = pcall(function()
+        return ReplicatedStorage:WaitForChild("@rbxts/wcs:source/networking@GlobalEvents", 5)
+    end)
+    if success and events then
+        local skillRemote = events:FindFirstChild("requestSkill")
+        if skillRemote then
+            return skillRemote
+        end
+    end
+    warn("Could not find remote events!")
+    return nil
+end
+
+local remoteEvents = getRemoteEvents()
+
+-- Load Fluent UI with error handling
+local Fluent, SaveManager, InterfaceManager
+local uiSuccess = pcall(function()
+    Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+    SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+    InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+end)
+
+if not uiSuccess then
+    warn("Failed to load UI libraries")
+    return
+end
+
+-- Settings
+local settings = {
+    autoFarm = false,
+    autoGrip = false,
+    raceSpin = false,
+    aptitudeSpin = false,
+    raceSpeed = 0.5,
+    aptitudeSpeed = 0.5,
+    targetRace = "Angel",
+    targetAptitude = "9000",
+    attackMethod = "Superior Light + Heavy",
+    positionOffset = 3,
+    gripRange = 50,
+    gripDelay = 3,
+    downHealthThreshold = 15,
+    maxDownHealth = 50,
+    selectedEnemies = {},
+    teleportHeight = 5,
+    attackDelay = 0.1,
+    useAttackerValue = true,
+    useHybridGrip = true,
+    gripWalkTimeout = 3,
+    gripStickDistance = 3,
+    useBKeyGrip = false,
+    -- GRIP VERIFICATION SETTINGS
+    maxTargetTime = 15,
+    targetUpdateFrequency = 0.5,
+    allowTargetSwitching = true,
+    waitForGripCompletion = true,
+    maxGripWaitTime = 15,
+    gripVerificationDelay = 2,
+    requireGripBeforeNext = true,
+    -- ENHANCED BOSS DOWN DETECTION SETTINGS
+    useAdvancedDownDetection = true,
+    downDetectionMethods = {
+        healthThreshold = true,
+        humanoidState = true,
+        platformStand = true,
+        velocityCheck = true,
+        positionStable = true,
+        healthRegenCheck = true,
+        aliveDeadCheck = true
+    },
+    bossHealthThreshold = 2,
+    regularHealthThreshold = 8,
+    healthRegenDetection = true,
+    velocityThreshold = 3,
+    positionStableTime = 2,
+    healthRegenTime = 3,
+    healthRegenThreshold = 3,
+    -- ANTI-STOPPING MEASURES
+    autoRestartFarm = true,
+    maxNoTargetTime = 8,
+    autoTargetRefresh = true,
+    farmHealthCheck = true,
+    keepAlivePing = 2
+}
+
+-- Boss list for special handling
+local bossEnemies = {
+    "Luo Wuji", "Liu Mei", "Qin Chen", "Enkelados", "Polybotes", "Porphyrion",
+    "Iron Fang", "Huang Ming", "Strong Dummy", "Giant", "Himoty Filbert"
+}
+
+-- Convert to lookup table
+local isBoss = {}
+for _, boss in ipairs(bossEnemies) do
+    isBoss[boss] = true
+end
+
+-- Global flag for auto attack system
+getgenv().b = true
+
+-- Stats
+local stats = {
+    raceSpins = 0,
+    aptitudeSpins = 0,
+    mobsKilled = 0,
+    attacks = 0,
+    grips = 0,
+    downMobsDetected = 0,
+    gripAttempts = 0,
+    gripSuccesses = 0,
+    teleports = 0,
+    superiorAttacks = 0,
+    errors = 0,
+    targetSwitches = 0,
+    targetScans = 0,
+    autoUpdates = 0,
+    gripWaits = 0,
+    gripTimeouts = 0,
+    skipsDueToGrip = 0,
+    bossesDetected = 0,
+    advancedDownDetections = 0,
+    healthRegenDetections = 0,
+    farmRestarts = 0,
+    noTargetEvents = 0,
+    keepAlivePings = 0,
+    comparisonErrors = 0,
+    typeValidationFixes = 0
+}
+
+-- ENHANCED STATE MANAGEMENT
+local farmState = {
+    isGripping = false,
+    isPaused = false,
+    currentTarget = nil,
+    targetStartTime = 0,
+    lastAttackTime = 0,
+    farmingActive = false,
+    lastTargetScan = 0,
+    targetUpdateTime = 0,
+    waitingForGrip = false,
+    gripWaitStartTime = 0,
+    lastDownTarget = nil,
+    pendingGripTarget = nil,
+    gripCompletionVerified = false,
+    lastTargetFoundTime = 0,
+    noTargetStartTime = 0,
+    lastFarmCheck = 0,
+    lastKeepAlive = 0,
+    farmRestartCount = 0
+}
+
+local gripState = {
+    downMobs = {},
+    mobHealthHistory = {},
+    lastGripTime = 0,
+    processingGrip = false,
+    gripQueue = {},
+    isGripMoving = false,
+    currentGripTarget = nil,
+    gripInProgress = false,
+    gripCompleted = false,
+    lastGripCompletionTime = 0
+}
+
+-- ENHANCED DOWN DETECTION DATA
+local downDetectionData = {
+    mobPositionHistory = {},
+    mobHealthHistory = {},
+    mobVelocityHistory = {},
+    detectionStartTime = {},
+    lastHealthCheck = {},
+    healthTrend = {},
+    confirmationTime = {}
+}
+
+-- ORIGINAL ENEMY LIST
+local allEnemies = {
+    "Assassin", "Lightning Assassin", "Wind Assassin", 
+    "Fang Ming", "Himoty Filbert", "Huang Ming", "Iron Fang", "Lin Fing",
+    "Jun Yi", "Ruo Yan",
+    "Claire", "Clarissa", "Clementine",
+    "Bao Bai", "Bao Hong", "Guo Shi", "Liu Ming",
+    "Enkelados", "Polybotes", "Porphyrion",
+    "Liu Mei", "Luo Wuji", "Qin Chen", "Sapling"
+}
+
+-- Initialize selected enemies
+for _, enemy in pairs({"Assassin", "Luo Wuji", "Liu Mei"}) do
+    settings.selectedEnemies[enemy] = true
+end
+
+-- Race and aptitude options
+local races = {"Angel", "Dragon", "Dwarf", "Elf", "Human", "Lizardman", "Neko"}
+local aptitudes = {"9000", "30", "29-30", "28-29", "27-28", "26-27", "25-26", "24-25", "23-24", "22-23", "21-22", "20-21", "19-20", "18-19", "17-18", "9-10", "8-9", "7-8", "6-7", "5-6", "4-5", "2-4"}
+
+print("✅ Variables loaded successfully with enhanced type validation")
+
+-- SAFE HELPER FUNCTIONS
+local function safeCall(func, ...)
+    local success, result = pcall(func, ...)
+    if not success then
+        stats.errors = stats.errors + 1
+        warn("Safe call failed: " .. tostring(result))
+        return false, result
+    end
+    return true, result
+end
+
+local function getDistanceToTarget(target)
+    if not target or not target:FindFirstChild("HumanoidRootPart") then
+        return math.huge
+    end
+    local success, distance = safeCall(function()
+        return (humanoidRootPart.Position - target.HumanoidRootPart.Position).Magnitude
+    end)
+    return success and toSafeNumber(distance, math.huge) or math.huge
+end
+
+-- SAFE CHARACTER VALIDATION
+local function validateCharacter()
+    if not character or not character.Parent then
+        character = player.Character
+        if character then
+            humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        end
+    end
+    return character and humanoidRootPart
+end
+
+-- FARM HEALTH MONITORING (Anti-stopping system)
+local function checkFarmHealth()
+    local now = tick()
+    
+    -- Check if auto farm is enabled but getgenv().b is false
+    if settings.autoFarm and not getgenv().b then
+        print("⚠️ Farm health issue: autoFarm enabled but getgenv().b is false - fixing...")
+        getgenv().b = true
+        stats.farmRestarts = stats.farmRestarts + 1
+    end
+    
+    -- Check if we haven't found a target in too long
+    if farmState.lastTargetFoundTime > 0 and safeCompare(now - farmState.lastTargetFoundTime, settings.maxNoTargetTime, ">") then
+        if settings.autoRestartFarm then
+            print("🔄 No targets found for " .. settings.maxNoTargetTime .. "s - restarting farm...")
+            farmState.currentTarget = nil
+            farmState.lastTargetFoundTime = now
+            getgenv().b = true
+            stats.farmRestarts = stats.farmRestarts + 1
+        end
+    end
+    
+    -- Keep alive ping
+    if safeCompare(now - farmState.lastKeepAlive, settings.keepAlivePing, ">") then
+        if settings.autoFarm then
+            getgenv().b = true
+            farmState.lastKeepAlive = now
+            stats.keepAlivePings = stats.keepAlivePings + 1
+        end
+    end
+    
+    farmState.lastFarmCheck = now
+end
+
+-- ENHANCED DOWN DETECTION SYSTEM WITH SAFE COMPARISONS
+local function updateMobHistory(mob, mobId)
+    local now = tick()
+    
+    if not downDetectionData.mobPositionHistory[mobId] then
+        downDetectionData.mobPositionHistory[mobId] = {}
+        downDetectionData.mobHealthHistory[mobId] = {}
+        downDetectionData.mobVelocityHistory[mobId] = {}
+        downDetectionData.detectionStartTime[mobId] = now
+        downDetectionData.lastHealthCheck[mobId] = 0
+        downDetectionData.healthTrend[mobId] = "stable"
+        downDetectionData.confirmationTime[mobId] = 0
+    end
+    
+    local success = safeCall(function()
+        local position = mob.HumanoidRootPart.Position
+        local health, maxHealth = getHealthSafely(mob.Humanoid)
+        local velocity = mob.HumanoidRootPart.Velocity
+        
+        -- Track health trend with safe comparison
+        local lastHealth = toSafeNumber(downDetectionData.lastHealthCheck[mobId], 0)
+        if safeCompare(lastHealth, 0, ">") then
+            local healthDiff = health - lastHealth
+            if safeCompare(healthDiff, 2, ">") then
+                downDetectionData.healthTrend[mobId] = "increasing"
+            elseif safeCompare(healthDiff, -2, "<") then
+                downDetectionData.healthTrend[mobId] = "decreasing"
+            else
+                downDetectionData.healthTrend[mobId] = "stable"
+            end
+        end
+        downDetectionData.lastHealthCheck[mobId] = health
+        
+        -- Store current data
+        table.insert(downDetectionData.mobPositionHistory[mobId], {position = position, time = now})
+        table.insert(downDetectionData.mobHealthHistory[mobId], {health = health, time = now})
+        table.insert(downDetectionData.mobVelocityHistory[mobId], {velocity = velocity, time = now})
+        
+        -- Keep only recent data (last 10 seconds)
+        local cutoffTime = now - 10
+        
+        for i = #downDetectionData.mobPositionHistory[mobId], 1, -1 do
+            if safeCompare(downDetectionData.mobPositionHistory[mobId][i].time, cutoffTime, "<") then
+                table.remove(downDetectionData.mobPositionHistory[mobId], i)
+            end
+        end
+        
+        for i = #downDetectionData.mobHealthHistory[mobId], 1, -1 do
+            if safeCompare(downDetectionData.mobHealthHistory[mobId][i].time, cutoffTime, "<") then
+                table.remove(downDetectionData.mobHealthHistory[mobId], i)
+            end
+        end
+        
+        for i = #downDetectionData.mobVelocityHistory[mobId], 1, -1 do
+            if safeCompare(downDetectionData.mobVelocityHistory[mobId][i].time, cutoffTime, "<") then
+                table.remove(downDetectionData.mobVelocityHistory[mobId], i)
+            end
+        end
+    end)
+    
+    return success
+end
+
+local function isPositionStable(mobId)
+    if not settings.downDetectionMethods.positionStable then return true end
+    
+    local posHistory = downDetectionData.mobPositionHistory[mobId]
+    if not posHistory or #posHistory < 2 then return false end
+    
+    local now = tick()
+    local stableTime = toSafeNumber(settings.positionStableTime, 2)
+    
+    -- Check if position has been stable for required time
+    local stableStartTime = nil
+    for i = #posHistory, 1, -1 do
+        local entry = posHistory[i]
+        if safeCompare(now - entry.time, stableTime, ">") then
+            stableStartTime = entry.time
+            break
+        end
+    end
+    
+    if not stableStartTime then return false end
+    
+    -- Check if all positions in stable time are close together
+    local basePosition = posHistory[1].position
+    for _, entry in ipairs(posHistory) do
+        if safeCompare(entry.time, stableStartTime, ">=") then
+            local distance = (entry.position - basePosition).Magnitude
+            if safeCompare(distance, 3, ">") then -- Moved more than 3 studs
+                return false
+            end
+        end
+    end
+    
+    return true
+end
+
+local function isVelocityLow(mobId)
+    if not settings.downDetectionMethods.velocityCheck then return true end
+    
+    local velHistory = downDetectionData.mobVelocityHistory[mobId]
+    if not velHistory or #velHistory == 0 then return false end
+    
+    -- Check recent velocity
+    local recentVelocities = {}
+    local now = tick()
+    for _, entry in ipairs(velHistory) do
+        if safeCompare(now - entry.time, 2, "<=") then -- Last 2 seconds
+            table.insert(recentVelocities, toSafeNumber(entry.velocity.Magnitude, 0))
+        end
+    end
+    
+    if #recentVelocities == 0 then return false end
+    
+    -- Calculate average velocity with safe numbers
+    local totalVel = 0
+    for _, vel in ipairs(recentVelocities) do
+        totalVel = totalVel + toSafeNumber(vel, 0)
+    end
+    local avgVelocity = totalVel / #recentVelocities
+    
+    return safeCompare(avgVelocity, settings.velocityThreshold, "<=")
+end
+
+local function isHealthRegenerating(mobId)
+    if not settings.downDetectionMethods.healthRegenCheck then return false end
+    
+    local healthHistory = downDetectionData.mobHealthHistory[mobId]
+    if not healthHistory or #healthHistory < 2 then return false end
+    
+    local now = tick()
+    local regenTime = toSafeNumber(settings.healthRegenTime, 3)
+    
+    -- Get health values from regen time ago and now
+    local oldHealth = nil
+    local newHealth = toSafeNumber(healthHistory[#healthHistory].health, 0)
+    
+    for _, entry in ipairs(healthHistory) do
+        if safeCompare(now - entry.time, regenTime, ">=") then
+            oldHealth = toSafeNumber(entry.health, 0)
+            break
+        end
+    end
+    
+    if not oldHealth then return false end
+    
+    -- Check if health increased significantly with safe comparison
+    local healthChange = newHealth - oldHealth
+    if safeCompare(healthChange, settings.healthRegenThreshold, ">=") then
+        stats.healthRegenDetections = stats.healthRegenDetections + 1
+        return true
+    end
+    
+    return false
+end
+
+-- ENHANCED ALIVE/DEAD VERIFICATION WITH SAFE COMPARISONS
+local function isEnemyActuallyDead(mob, mobId)
+    if not settings.downDetectionMethods.aliveDeadCheck then
+        return true -- Skip check if disabled
+    end
+    
+    local success, isDead = safeCall(function()
+        local humanoid = mob.Humanoid
+        local health, maxHealth = getHealthSafely(humanoid)
+        local now = tick()
+        
+        -- Definitive dead states
+        if safeCompare(health, 0, "<=") then return true end
+        
+        local state = humanoid:GetState()
+        if state == Enum.HumanoidStateType.Dead then return true end
+        
+        -- Check if humanoid is disabled/destroyed
+        if not humanoid.Parent then return true end
+        
+        -- For very low health, check multiple factors
+        if safeCompare(health, 5, "<=") then
+            -- Start confirmation timer
+            if not downDetectionData.confirmationTime[mobId] then
+                downDetectionData.confirmationTime[mobId] = now
+                return false -- Wait for confirmation
+            end
+            
+            local confirmationTime = now - downDetectionData.confirmationTime[mobId]
+            if safeCompare(confirmationTime, 1, ">=") then -- 1 second confirmation
+                -- Check health trend
+                local healthTrend = downDetectionData.healthTrend[mobId] or "stable"
+                
+                -- If health is increasing significantly, enemy is likely alive
+                if healthTrend == "increasing" and safeCompare(health, 3, ">") then
+                    print("⚠️ ENEMY ALIVE: " .. mob.Name .. " (" .. health .. "% HP, health increasing)")
+                    downDetectionData.confirmationTime[mobId] = nil
+                    return false
+                end
+                
+                -- Check velocity - if moving fast, likely alive
+                local recentVel = downDetectionData.mobVelocityHistory[mobId]
+                if recentVel and #recentVel > 0 then
+                    local lastVel = toSafeNumber(recentVel[#recentVel].velocity.Magnitude, 0)
+                    if safeCompare(lastVel, 5, ">") then -- Moving significantly
+                        print("⚠️ ENEMY ALIVE: " .. mob.Name .. " (" .. health .. "% HP, velocity: " .. math.floor(lastVel) .. ")")
+                        downDetectionData.confirmationTime[mobId] = nil
+                        return false
+                    end
+                end
+                
+                -- Passed all checks - likely dead
+                return true
+            end
+            
+            return false -- Still confirming
+        else
+            -- Reset confirmation timer for higher health
+            downDetectionData.confirmationTime[mobId] = nil
+        end
+        
+        return false -- Not dead
+    end)
+    
+    return success and isDead or false
+end
+
+-- ENHANCED DOWN STATE DETECTION WITH SAFE COMPARISONS
+function isMobDown(mob)
+    if not mob or not mob:FindFirstChild("Humanoid") or not mob:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local mobId = tostring(mob)
+    local mobName = mob.Name
+    local isBossEnemy = isBoss[mobName] or false
+    
+    -- Update mob history for advanced detection
+    if settings.useAdvancedDownDetection then
+        updateMobHistory(mob, mobId)
+    end
+    
+    local success, isDown = safeCall(function()
+        local humanoid = mob.Humanoid
+        local health, maxHealth = getHealthSafely(humanoid)
+        
+        -- Use different thresholds for bosses vs regular enemies
+        local threshold = isBossEnemy and toSafeNumber(settings.bossHealthThreshold, 2) or toSafeNumber(settings.regularHealthThreshold, 8)
+        
+        -- METHOD 1: Basic health check with safe comparisons
+        if settings.downDetectionMethods.healthThreshold then
+            if safeCompare(health, 0, "<=") then 
+                stats.typeValidationFixes = stats.typeValidationFixes + 1
+                return true 
+            end
+            if safeHealthCheck(health, threshold) then 
+                -- Additional verification for very low health
+                if safeCompare(health, 5, "<=") and not isEnemyActuallyDead(mob, mobId) then
+                    return false -- Enemy is alive despite low health
+                end
+                print("🔍 DOWN DETECTED (Health): " .. mobName .. " (" .. health .. "/" .. maxHealth .. ")")
+                stats.typeValidationFixes = stats.typeValidationFixes + 1
+                return true 
+            end
+            if safeCompare(maxHealth, 0, ">") and safeCompare(health, (maxHealth * (threshold/100)), "<=") then 
+                -- Additional verification for very low health percentage
+                local healthPercent = getHealthPercentage(humanoid)
+                if safeCompare(healthPercent, 5, "<=") and not isEnemyActuallyDead(mob, mobId) then
+                    return false -- Enemy is alive despite low health %
+                end
+                print("🔍 DOWN DETECTED (Health %): " .. mobName .. " (" .. math.floor(healthPercent) .. "%)")
+                stats.typeValidationFixes = stats.typeValidationFixes + 1
+                return true 
+            end
+        end
+        
+        -- METHOD 2: Humanoid state check
+        if settings.downDetectionMethods.humanoidState then
+            local state = humanoid:GetState()
+            if state == Enum.HumanoidStateType.Dead or 
+               state == Enum.HumanoidStateType.Physics or
+               state == Enum.HumanoidStateType.Ragdoll then
+                print("🔍 DOWN DETECTED (State): " .. mobName .. " (" .. tostring(state) .. ")")
+                return true
+            end
+        end
+        
+        -- METHOD 3: Platform stand check
+        if settings.downDetectionMethods.platformStand then
+            if humanoid.PlatformStand then 
+                print("🔍 DOWN DETECTED (PlatformStand): " .. mobName)
+                return true 
+            end
+        end
+        
+        -- ADVANCED METHODS (only if enabled)
+        if settings.useAdvancedDownDetection then
+            -- METHOD 4: Velocity check (not moving much)
+            if isVelocityLow(mobId) and safeCompare(health, maxHealth * 0.5, "<=") then
+                print("🔍 DOWN DETECTED (Low Velocity): " .. mobName)
+                return true
+            end
+            
+            -- METHOD 5: Position stability check
+            if isPositionStable(mobId) and safeCompare(health, maxHealth * 0.3, "<=") then
+                print("🔍 DOWN DETECTED (Position Stable): " .. mobName)
+                return true
+            end
+            
+            -- METHOD 6: Health regeneration detection (special case)
+            if settings.healthRegenDetection and isHealthRegenerating(mobId) then
+                -- If health is regenerating but still low, likely down but healing
+                if safeCompare(health, maxHealth * 0.4, "<=") then
+                    print("🔍 DOWN DETECTED (Health Regen + Low HP): " .. mobName)
+                    return true
+                end
+            end
+        end
+        
+        return false
+    end)
+    
+    if success and isDown then
+        stats.advancedDownDetections = stats.advancedDownDetections + 1
+        if isBossEnemy then
+            stats.bossesDetected = stats.bossesDetected + 1
+        end
+    elseif not success then
+        stats.comparisonErrors = stats.comparisonErrors + 1
+        warn("Failed mob down detection for: " .. mobName)
+    end
+    
+    return success and isDown or false
+end
+
+-- GRIP VERIFICATION FUNCTIONS
+local function isTargetGripComplete(target)
+    if not target or not target.Parent then
+        return true -- Target disappeared, consider it "complete"
+    end
+    
+    -- If target is no longer down, it was likely gripped or recovered
+    if not isMobDown(target) then
+        return false -- Still alive and not down, not gripped
+    end
+    
+    -- Check if target disappeared (gripped and despawned)
+    if not target:FindFirstChild("HumanoidRootPart") or not target:FindFirstChild("Humanoid") then
+        return true
+    end
+    
+    -- Additional check: if health is 0 for extended time
+    local success, health = safeCall(function()
+        local h, _ = getHealthSafely(target.Humanoid)
+        return h
+    end)
+    
+    if success and safeCompare(health, 0, "<=") then
+        return true
+    end
+    
+    return false
+end
+
+local function waitForGripCompletion(target, maxWaitTime)
+    if not target or not settings.waitForGripCompletion then
+        return true
+    end
+    
+    local waitStartTime = tick()
+    farmState.waitingForGrip = true
+    farmState.gripWaitStartTime = waitStartTime
+    farmState.pendingGripTarget = target
+    stats.gripWaits = stats.gripWaits + 1
+    
+    print("⏳ WAITING FOR GRIP COMPLETION: " .. target.Name .. " (Max wait: " .. maxWaitTime .. "s)")
+    
+    while safeCompare(tick() - waitStartTime, maxWaitTime, "<") do
+        -- Check if grip is completed
+        if isTargetGripComplete(target) then
+            print("✅ GRIP COMPLETION VERIFIED: " .. target.Name)
+            farmState.waitingForGrip = false
+            farmState.pendingGripTarget = nil
+            farmState.gripCompletionVerified = true
+            
+            -- Additional delay to ensure grip is fully processed
+            if safeCompare(settings.gripVerificationDelay, 0, ">") then
+                print("⏳ Grip verification delay: " .. settings.gripVerificationDelay .. "s")
+                task.wait(toSafeNumber(settings.gripVerificationDelay, 2))
+            end
+            
+            return true
+        end
+        
+        -- Check if grip process is still active
+        if not settings.autoGrip or not (farmState.isGripping or gripState.processingGrip) then
+            print("⚠️ Grip process stopped, continuing...")
+            break
+        end
+        
+        task.wait(0.5)
+    end
+    
+    -- Timeout reached
+    print("⏰ GRIP WAIT TIMEOUT: " .. target.Name .. " (Waited " .. (tick() - waitStartTime) .. "s)")
+    farmState.waitingForGrip = false
+    farmState.pendingGripTarget = nil
+    stats.gripTimeouts = stats.gripTimeouts + 1
+    
+    return false
+end
+
+-- IMPROVED TARGET MANAGEMENT SYSTEM
+local function isTargetStillValid(target)
+    if not target or not target.Parent then
+        return false
+    end
+    
+    if not target:FindFirstChild("HumanoidRootPart") or not target:FindFirstChild("Humanoid") then
+        return false
+    end
+    
+    -- Check if target is still alive and not down
+    return not isMobDown(target)
+end
+
+local function shouldUpdateTarget()
+    local now = tick()
+    
+    -- Don't update if waiting for grip completion
+    if farmState.waitingForGrip then
+        print("🚫 Skipping target update - waiting for grip completion")
+        stats.skipsDueToGrip = stats.skipsDueToGrip + 1
+        return false
+    end
+    
+    -- Always update if no current target
+    if not farmState.currentTarget then
+        return true
+    end
+    
+    -- Don't update during grip operations
+    if farmState.isGripping or gripState.processingGrip or gripState.isGripMoving then
+        return false
+    end
+    
+    -- Check if current target is invalid
+    if not isTargetStillValid(farmState.currentTarget) then
+        print("🔄 Target invalid, checking grip completion...")
+        
+        -- If target went down and we require grip completion, wait for it
+        if settings.requireGripBeforeNext and isMobDown(farmState.currentTarget) and settings.autoGrip then
+            if not farmState.waitingForGrip then
+                local gripWaitSuccess = waitForGripCompletion(farmState.currentTarget, settings.maxGripWaitTime)
+                if gripWaitSuccess then
+                    print("✅ Grip completed, can update target")
+                    return true
+                else
+                    print("⏰ Grip wait timeout, forcing target update")
+                    return true
+                end
+            end
+            return false
+        end
+        
+        return true
+    end
+    
+    -- Check if target has been active too long
+    local timeOnTarget = now - farmState.targetStartTime
+    if safeCompare(timeOnTarget, settings.maxTargetTime, ">") then
+        print("🔄 Target time exceeded (" .. math.floor(timeOnTarget) .. "s), updating...")
+        return true
+    end
+    
+    -- Regular update check
+    local timeSinceUpdate = now - farmState.targetUpdateTime
+    if safeCompare(timeSinceUpdate, settings.targetUpdateFrequency, ">") and settings.allowTargetSwitching then
+        return true
+    end
+    
+    return false
+end
+
+local function setNewTarget(target, reason)
+    local now = tick()
+    
+    if target ~= farmState.currentTarget then
+        local oldTarget = farmState.currentTarget and farmState.currentTarget.Name or "None"
+        farmState.currentTarget = target
+        farmState.targetStartTime = now
+        farmState.targetUpdateTime = now
+        farmState.gripCompletionVerified = false
+        stats.targetSwitches = stats.targetSwitches + 1
+        stats.autoUpdates = stats.autoUpdates + 1
+        
+        if target then
+            farmState.lastTargetFoundTime = now
+        end
+        
+        local newTarget = target and target.Name or "None"
+        print("🎯 TARGET UPDATE: " .. oldTarget .. " → " .. newTarget .. " - " .. (reason or "Auto"))
+    end
+end
+
+-- IMPROVED STATE MANAGEMENT FUNCTIONS
+local function setGrippingState(state, reason)
+    farmState.isGripping = state
+    gripState.processingGrip = state
+    gripState.gripInProgress = state
+    
+    if state then
+        -- Mark current target as grip target
+        if farmState.currentTarget then
+            gripState.currentGripTarget = farmState.currentTarget
+        end
+    else
+        -- Mark grip as completed
+        gripState.gripCompleted = true
+        gripState.lastGripCompletionTime = tick()
+        gripState.currentGripTarget = nil
+    end
+    
+    print(string.format("🔄 Gripping state: %s - %s", tostring(state), reason or "Unknown"))
+end
+
+local function pauseFarming(reason)
+    farmState.isPaused = true
+    getgenv().b = false
+    print("⏸️ Farming paused - " .. (reason or "Unknown"))
+end
+
+local function resumeFarming(reason)
+    farmState.isPaused = false
+    if settings.autoFarm then
+        getgenv().b = true
+    end
+    print("▶️ Farming resumed - " .. (reason or "Unknown"))
+end
+
+local function stopAllAttacks()
+    getgenv().b = false
+    
+    if not remoteEvents then
+        warn("No remote events available for stopping attacks")
+        return
+    end
+    
+    safeCall(function()
+        local args = {{buffer = buffer.fromstring("\v\000\000\000LightAttack\000\000\000\000\000"), blobs = {}}}
+        remoteEvents:FireServer(unpack(args))
+    end)
+    
+    safeCall(function()
+        local args = {{buffer = buffer.fromstring("\v\000\000\000HeavyAttack\000\000\000\000\000"), blobs = {}}}
+        remoteEvents:FireServer(unpack(args))
+    end)
+    
+    print("🛑 All attacks stopped")
+end
+
+-- IMPROVED ATTACK SYSTEM
+local function canAttack()
+    return settings.autoFarm and 
+           not farmState.isGripping and 
+           not farmState.isPaused and 
+           not gripState.processingGrip and 
+           not gripState.isGripMoving and
+           not farmState.waitingForGrip and
+           validateCharacter() and
+           remoteEvents
+end
+
+-- Create allowedEnemies lookup table for auto attack system
+local function updateAllowedEnemies()
+    local allowedEnemies = {}
+    for enemyName, isSelected in pairs(settings.selectedEnemies) do
+        if isSelected then
+            allowedEnemies[enemyName] = true
+        end
+    end
+    return allowedEnemies
+end
+
+-- SAFE ATTACK FUNCTIONS
+local function performSuperiorAttack(attackType)
+    if not canAttack() or not remoteEvents then
+        return false
+    end
+    
+    local success = safeCall(function()
+        local bufferString = attackType == "Light" and 
+            "\v\000\000\000LightAttack\001\000\000\000\000" or 
+            "\v\000\000\000HeavyAttack\001\000\000\000\000"
+        
+        local args = {{buffer = buffer.fromstring(bufferString), blobs = {}}}
+        remoteEvents:FireServer(unpack(args))
+        
+        stats.attacks = stats.attacks + 1
+        stats.superiorAttacks = stats.superiorAttacks + 1
+        farmState.lastAttackTime = tick()
+    end)
+    
+    return success
+end
+
+-- IMPROVED TARGET VALIDATION
+local function isValidTarget(target)
+    if not target or not target:FindFirstChild("HumanoidRootPart") or not target:FindFirstChild("Humanoid") then
+        return false
+    end
+    
+    local allowedEnemies = updateAllowedEnemies()
+    local isValidEnemy = allowedEnemies[target.Name]
+    
+    if settings.useAttackerValue and isValidEnemy then
+        isValidEnemy = target:FindFirstChild("AttackerValue") ~= nil
+    end
+    
+    return isValidEnemy and not isMobDown(target)
+end
+
+-- SMART TARGET FINDING WITH BOSS DETECTION
+local function findBestTarget()
+    -- Don't find new target if waiting for grip
+    if farmState.waitingForGrip then
+        return farmState.currentTarget
+    end
+    
+    stats.targetScans = stats.targetScans + 1
+    local now = tick()
+    farmState.lastTargetScan = now
+    
+    -- Find all valid targets
+    local validTargets = {}
+    
+    for _, v in pairs(workspace.World.Characters:GetChildren()) do
+        if isValidTarget(v) then
+            local distance = getDistanceToTarget(v)
+            local isBossEnemy = isBoss[v.Name] or false
+            table.insert(validTargets, {
+                mob = v,
+                distance = distance,
+                name = v.Name,
+                isBoss = isBossEnemy
+            })
+        end
+    end
+    
+    if #validTargets == 0 then
+        -- Track no target events
+        if farmState.noTargetStartTime == 0 then
+            farmState.noTargetStartTime = now
+        end
+        stats.noTargetEvents = stats.noTargetEvents + 1
+        return nil
+    else
+        -- Reset no target timer
+        farmState.noTargetStartTime = 0
+    end
+    
+    -- Sort by priority: bosses first, then by distance
+    table.sort(validTargets, function(a, b)
+        if a.isBoss and not b.isBoss then
+            return true
+        elseif not a.isBoss and b.isBoss then
+            return false
+        else
+            return a.distance < b.distance
+        end
+    end)
+    
+    -- If current target is still valid and close, keep it (unless it's been too long)
+    if farmState.currentTarget and isTargetStillValid(farmState.currentTarget) then
+        local timeOnTarget = now - farmState.targetStartTime
+        local currentDistance = getDistanceToTarget(farmState.currentTarget)
+        
+        -- Keep current target if it's still reasonably close and hasn't been too long
+        if safeCompare(timeOnTarget, settings.maxTargetTime, "<") and safeCompare(currentDistance, 100, "<") then
+            for _, targetData in ipairs(validTargets) do
+                if targetData.mob == farmState.currentTarget then
+                    return farmState.currentTarget
+                end
+            end
+        end
+    end
+    
+    -- Return best target (prioritizes bosses)
+    return validTargets[1].mob
+end
+
+-- AUTO TARGET UPDATE LOOP WITH ANTI-STOPPING
+spawn(function()
+    while true do
+        if settings.autoFarm and not farmState.isPaused then
+            -- Check farm health
+            if settings.farmHealthCheck then
+                checkFarmHealth()
+            end
+            
+            if shouldUpdateTarget() then
+                local newTarget = findBestTarget()
+                setNewTarget(newTarget, "Auto scan with boss awareness")
+            end
+        end
+        task.wait(toSafeNumber(settings.targetUpdateFrequency, 0.5))
+    end
+end)
+
+-- IMPROVED AUTO ATTACK LOOP WITH ANTI-STOPPING
+spawn(function()
+    while task.wait(0.1) do
+        if getgenv().b == true and canAttack() then
+            local target = farmState.currentTarget
+
+            if target and isTargetStillValid(target) and canAttack() then
+                -- SAFE TELEPORT TO TARGET
+                local teleportSuccess = safeCall(function()
+                    humanoidRootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, toSafeNumber(settings.positionOffset, 3))
+                    stats.teleports = stats.teleports + 1
+                end)
+
+                if teleportSuccess then
+                    -- SUPERIOR ATTACKS (safe version)
+                    if canAttack() and isTargetStillValid(target) then
+                        performSuperiorAttack("Light")
+                        
+                        task.wait(toSafeNumber(settings.attackDelay, 0.1))
+                        
+                        if target.Parent and canAttack() and isTargetStillValid(target) then
+                            performSuperiorAttack("Heavy")
+                        end
+                    end
+                    
+                    -- Check if target went down (using enhanced detection)
+                    if target.Parent and isMobDown(target) then
+                        stopAllAttacks()
+                        stats.mobsKilled = stats.mobsKilled + 1
+                        farmState.lastDownTarget = target
+                        local isBossEnemy = isBoss[target.Name] or false
+                        print("📉 Target Down: " .. target.Name .. (isBossEnemy and " (BOSS)" or "") .. " - Enhanced detection")
+                        
+                        if settings.autoGrip then
+                            pauseFarming("Target down, waiting for grip with enhanced detection")
+                        else
+                            -- If no auto grip, immediately look for new target
+                            setNewTarget(nil, "Target down, no auto grip")
+                        end
+                    end
+                end
+            else
+                -- No valid target, try to find one (only if not waiting for grip)
+                if not farmState.currentTarget and not farmState.waitingForGrip then
+                    local newTarget = findBestTarget()
+                    setNewTarget(newTarget, "No current target")
+                end
+            end
+        elseif settings.autoFarm then
+            -- Auto farm is enabled but we're not attacking - try to fix
+            if not farmState.isGripping and not farmState.isPaused and not farmState.waitingForGrip then
+                getgenv().b = true
+            end
+        end
+    end
+end)
+
+-- IMPROVED GRIP MOVEMENT
+local function hybridGripMovement(mob)
+    if not mob or not mob:FindFirstChild("HumanoidRootPart") or not validateCharacter() then 
+        return false 
+    end
+    
+    gripState.isGripMoving = true
+    local mobRoot = mob.HumanoidRootPart
+    local distance = getDistanceToTarget(mob)
+    
+    print(string.format("🤲 HYBRID GRIP APPROACH to %s - Distance: %.1f", mob.Name, distance))
+    
+    local success = false
+    
+    -- Step 1: Safe teleport close to target
+    print("⚡ GRIP TELEPORT: Moving close to target...")
+    local teleportSuccess = safeCall(function()
+        humanoidRootPart.CFrame = CFrame.new(mobRoot.Position) * CFrame.new(0, 2, toSafeNumber(settings.gripStickDistance, 3))
+        stats.teleports = stats.teleports + 1
+    end)
+    
+    if teleportSuccess then
+        task.wait(0.1)
+        
+        -- Step 2: Safe walk for precision
+        if mob.Parent and settings.useHybridGrip then
+            print("🏃 GRIP WALK: Fine-tuning position...")
+            local walkStart = tick()
+            local gripDistance = getDistanceToTarget(mob)
+            
+            while mob.Parent and safeCompare(gripDistance, settings.gripStickDistance, ">") and safeCompare(tick() - walkStart, settings.gripWalkTimeout, "<") do
+                if not settings.autoGrip or not gripState.processingGrip then break end
+                
+                safeCall(function()
+                    character.Humanoid:MoveTo(mobRoot.Position)
+                end)
+                
+                task.wait(0.1)
+                gripDistance = getDistanceToTarget(mob)
+            end
+        end
+        
+        -- Step 3: Safe final positioning
+        if mob.Parent then
+            local finalPosSuccess = safeCall(function()
+                humanoidRootPart.CFrame = CFrame.new(mobRoot.Position) * CFrame.new(0, 2, 0)
+            end)
+            
+            if finalPosSuccess then
+                success = true
+                print("✅ COMBINED GRIP POSITION ACHIEVED!")
+            end
+        end
+    end
+    
+    gripState.isGripMoving = false
+    return success
+end
+
+-- IMPROVED AUTO GRIP SYSTEM WITH ENHANCED DETECTION
+local function performAutoGrip(mob)
+    if not mob or not mob.Parent or farmState.isGripping or gripState.processingGrip or not validateCharacter() then 
+        return false 
+    end
+    
+    local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+    if not mobRoot then return false end
+    
+    local isBossEnemy = isBoss[mob.Name] or false
+    local mobId = tostring(mob)
+    
+    -- Enhanced verification before gripping
+    if not isEnemyActuallyDead(mob, mobId) then
+        print("⚠️ GRIP CANCELLED: " .. mob.Name .. " may still be alive!")
+        return false
+    end
+    
+    stats.gripAttempts = stats.gripAttempts + 1
+    setGrippingState(true, "Starting enhanced grip on " .. mob.Name .. (isBossEnemy and " (BOSS)" or ""))
+    pauseFarming("Auto grip with enhanced detection initiated")
+    stopAllAttacks()
+    
+    local success = false
+    
+    local gripSuccess = safeCall(function()
+        print("🤲 ENHANCED GRIP SEQUENCE: " .. mob.Name .. (isBossEnemy and " (BOSS)" or ""))
+        
+        -- Use combined hybrid movement
+        if hybridGripMovement(mob) then
+            print("✅ Combined grip positioning successful")
+        else
+            print("⚠️ Grip positioning failed, trying anyway...")
+        end
+        
+        -- Check if mob still exists
+        if not mob.Parent then
+            print("⚠️ Grip failed: Mob disappeared during positioning")
+            return false
+        end
+
+        -- Final verification before gripping
+        if not isEnemyActuallyDead(mob, mobId) then
+            print("⚠️ Grip cancelled: Enemy became alive during positioning")
+            return false
+        end
+
+        -- Execute grip (safe version)
+        if remoteEvents then
+            print("🤲 Executing enhanced grip on " .. mob.Name)
+            local args = {{ buffer = buffer.fromstring("\004\000\000\000Grip\001\000\000\000\000"), blobs = {} }}
+            remoteEvents:FireServer(unpack(args))
+            
+            stats.grips = stats.grips + 1
+            stats.gripSuccesses = stats.gripSuccesses + 1
+            
+            if Fluent then
+                Fluent:Notify({ 
+                    Title = "🤲 ENHANCED GRIP SUCCESS!", 
+                    Content = "Gripped " .. mob.Name .. (isBossEnemy and " (BOSS)" or "") .. " with enhanced detection!", 
+                    Duration = 3 
+                })
+            end
+            
+            return true
+        end
+        
+        return false
+    end)
+    
+    success = gripSuccess
+    
+    -- Wait for grip animation (longer for bosses)
+    local gripDelay = isBossEnemy and (toSafeNumber(settings.gripDelay, 3) + 2) or toSafeNumber(settings.gripDelay, 3)
+    print("⏳ Waiting " .. gripDelay .. " seconds for grip animation...")
+    task.wait(gripDelay)
+    
+    -- Clean up state and mark grip as completed
+    setGrippingState(false, "Enhanced grip completed")
+    resumeFarming("Grip process finished with enhanced detection")
+    gripState.lastGripTime = tick()
+    
+    -- Clear target after successful grip to force finding new one
+    setNewTarget(nil, "Grip completed successfully")
+    
+    return success
+end
+
+-- IMPROVED DOWN MOB MANAGEMENT WITH ENHANCED VALIDATION
+local function updateDownMobs()
+    if not settings.autoGrip then return end
+    
+    -- Clean up old/invalid entries
+    for mobId, mobData in pairs(gripState.downMobs) do
+        if not mobData.mob or not mobData.mob.Parent or safeCompare(tick() - mobData.timeDetected, 10, ">") then
+            gripState.downMobs[mobId] = nil
+        end
+    end
+    
+    -- Find new down mobs (safe version)
+    safeCall(function()
+        for _, mob in pairs(workspace.World.Characters:GetChildren()) do
+            if mob:FindFirstChild("Humanoid") and mob:FindFirstChild("HumanoidRootPart") then
+                local mobName = mob.Name
+                local mobId = tostring(mob)
+                
+                -- Enhanced enemy validation
+                local allowedEnemies = updateAllowedEnemies()
+                local isValidEnemy = allowedEnemies[mobName]
+                if settings.useAttackerValue and isValidEnemy then
+                    isValidEnemy = mob:FindFirstChild("AttackerValue") ~= nil
+                end
+                
+                if isValidEnemy and isMobDown(mob) and not gripState.downMobs[mobId] then
+                    local isBossEnemy = isBoss[mobName] or false
+                    local priority = 5
+                    
+                    if isBossEnemy then
+                        priority = 15 -- Higher priority for bosses
+                    elseif mobName == "Luo Wuji" or mobName == "Liu Mei" then
+                        priority = 10
+                    end
+                    
+                    gripState.downMobs[mobId] = {
+                        mob = mob,
+                        name = mobName,
+                        timeDetected = tick(),
+                        gripped = false,
+                        priority = priority,
+                        isBoss = isBossEnemy
+                    }
+                    stats.downMobsDetected = stats.downMobsDetected + 1
+                    print("💀 DOWN MOB DETECTED: " .. mobName .. (isBossEnemy and " (BOSS)" or "") .. " (Priority: " .. priority .. ")")
+                    
+                    if Fluent then
+                        Fluent:Notify({ 
+                            Title = "💀 " .. (isBossEnemy and "BOSS" or "Enemy") .. " Down!", 
+                            Content = mobName .. " ready for enhanced grip!", 
+                            Duration = 2 
+                        })
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function processGripQueue()
+    if not settings.autoGrip or farmState.isGripping or gripState.processingGrip then 
+        return 
+    end
+    
+    -- Find highest priority ungripped mob
+    local bestMob = nil
+    local bestPriority = 0
+    
+    for mobId, mobData in pairs(gripState.downMobs) do
+        if not mobData.gripped and mobData.mob and mobData.mob.Parent then
+            if safeCompare(mobData.priority, bestPriority, ">") and safeCompare(tick() - mobData.timeDetected, 0.3, ">=") then
+                bestMob = mobData
+                bestPriority = mobData.priority
+            end
+        end
+    end
+    
+    if bestMob then
+        local mobType = bestMob.isBoss and "BOSS" or "MOB"
+        print("🎯 Processing ENHANCED grip for " .. mobType .. ": " .. bestMob.name)
+        if performAutoGrip(bestMob.mob) then
+            bestMob.gripped = true
+        end
+    end
+end
+
+-- SAFE MANUAL GRIP FUNCTION
+local function manualGrip()
+    if not remoteEvents then
+        warn("No remote events available for manual grip")
+        return
+    end
+    
+    safeCall(function()
+        local args = {{buffer = buffer.fromstring("\004\000\000\000Grip\001\000\000\000\000"), blobs = {}}}
+        remoteEvents:FireServer(unpack(args))
+        stats.grips = stats.grips + 1
+    end)
+end
+
+-- SAFE SPIN FUNCTIONS
+local function raceSpin() 
+    safeCall(function() 
+        local spinService = ReplicatedStorage:FindFirstChild("Services")
+        if spinService then
+            local spinServiceRF = spinService:FindFirstChild("SpinService")
+            if spinServiceRF then
+                local rfSpin = spinServiceRF:FindFirstChild("RF")
+                if rfSpin then
+                    local spin = rfSpin:FindFirstChild("Spin")
+                    if spin then
+                        spin:InvokeServer("RaceSpins")
+                        stats.raceSpins = stats.raceSpins + 1
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function aptitudeSpin() 
+    safeCall(function() 
+        local spinService = ReplicatedStorage:FindFirstChild("Services")
+        if spinService then
+            local spinServiceRF = spinService:FindFirstChild("SpinService")
+            if spinServiceRF then
+                local rfSpin = spinServiceRF:FindFirstChild("RF")
+                if rfSpin then
+                    local spin = rfSpin:FindFirstChild("Spin")
+                    if spin then
+                        spin:InvokeServer("AptitudeSpins")
+                        stats.aptitudeSpins = stats.aptitudeSpins + 1
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function getCurrentRace() 
+    local r = "Unknown"
+    safeCall(function()
+        if player.PlayerGui and player.PlayerGui:FindFirstChild("Shop") then
+            local shop = player.PlayerGui.Shop
+            if shop:FindFirstChild("Core") then
+                local core = shop.Core
+                if core:FindFirstChild("Background") then
+                    local bg = core.Background
+                    if bg:FindFirstChild("Displays") then
+                        local displays = bg.Displays
+                        if displays:FindFirstChild("Race") then
+                            local race = displays.Race
+                            if race:FindFirstChild("Race") then
+                                local raceInner = race.Race
+                                if raceInner:FindFirstChild("Title") then
+                                    r = raceInner.Title.Text
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    return r 
+end
+
+local function getCurrentAptitude() 
+    local a = "Unknown"
+    safeCall(function()
+        if player.PlayerGui and player.PlayerGui:FindFirstChild("Shop") then
+            local shop = player.PlayerGui.Shop
+            if shop:FindFirstChild("Core") then
+                local core = shop.Core
+                if core:FindFirstChild("Background") then
+                    local bg = core.Background
+                    if bg:FindFirstChild("Displays") then
+                        local displays = bg.Displays
+                        if displays:FindFirstChild("Aptitude") then
+                            local aptitude = displays.Aptitude
+                            if aptitude:FindFirstChild("Aptitude") then
+                                local aptitudeInner = aptitude.Aptitude
+                                for _, c in pairs(aptitudeInner:GetChildren()) do 
+                                    if c:IsA("TextLabel") and c.Text ~= "" then 
+                                        a = c.Text
+                                        break 
+                                    end 
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    return a 
+end
+
+print("✅ All functions loaded with enhanced boss detection and fixed comparisons")
+
+-- SAFE MAIN LOOPS
+
+-- AUTO GRIP LOOP
+spawn(function()
+    while true do
+        safeCall(function()
+            if settings.autoGrip then
+                updateDownMobs()
+                processGripQueue()
+            else
+                gripState.downMobs = {}
+            end
+        end)
+        task.wait(0.15)
+    end
+end)
+
+-- RACE SPIN LOOP
+spawn(function()
+    local lastRaceSpin = 0
+    while true do
+        safeCall(function()
+            if settings.raceSpin and safeCompare(tick() - lastRaceSpin, settings.raceSpeed, ">=") then
+                if getCurrentRace() == settings.targetRace then
+                    settings.raceSpin = false
+                    if Fluent then
+                        Fluent:Notify({ 
+                            Title = "🎯 TARGET ACHIEVED!", 
+                            Content = "Race: " .. getCurrentRace(), 
+                            Duration = 5 
+                        })
+                    end
+                else
+                    raceSpin()
+                    lastRaceSpin = tick()
+                end
+            end
+        end)
+        task.wait(0.1)
+    end
+end)
+
+-- APTITUDE SPIN LOOP
+spawn(function()
+    local lastAptitudeSpin = 0
+    while true do
+        safeCall(function()
+            if settings.aptitudeSpin and safeCompare(tick() - lastAptitudeSpin, settings.aptitudeSpeed, ">=") then
+                if getCurrentAptitude() == settings.targetAptitude then
+                    settings.aptitudeSpin = false
+                    if Fluent then
+                        Fluent:Notify({ 
+                            Title = "🎯 TARGET ACHIEVED!", 
+                            Content = "Aptitude: " .. getCurrentAptitude(), 
+                            Duration = 5 
+                        })
+                    end
+                else
+                    aptitudeSpin()
+                    lastAptitudeSpin = tick()
+                end
+            end
+        end)
+        task.wait(0.1)
+    end
+end)
+
+print("✅ Main loops started with enhanced detection and fixed comparisons")
+
+-- CREATE FLUENT UI
+if not Fluent then
+    warn("Fluent UI not loaded, creating minimal interface")
+    return
+end
+
+local windowSuccess, Window = safeCall(function()
+    return Fluent:CreateWindow({
+        Title = "Murim Cultivation - ENHANCED BOSS DETECTION V2.1 COMPLETE",
+        SubTitle = "Fixed Comparisons + Anti-Stop + Boss Detection - by ILOVEASIANSANDLATINASS",
+        TabWidth = 160,
+        Size = UDim2.fromOffset(700, 640),
+        Acrylic = true,
+        Theme = "Dark",
+        MinimizeKey = Enum.KeyCode.RightShift
+    })
+end)
+
+if not windowSuccess then
+    warn("Failed to create main window")
+    return
+end
+
+local Tabs = {
+    AutoFarm = Window:AddTab({ Title = "⚔️ Auto Farm", Icon = "sword" }),
+    Grip = Window:AddTab({ Title = "🤲 Enhanced Grip", Icon = "hand" }),
+    Detection = Window:AddTab({ Title = "🔍 Boss Detection", Icon = "search" }),
+    AntiStop = Window:AddTab({ Title = "🛡️ Anti-Stop", Icon = "shield" }),
+    Verification = Window:AddTab({ Title = "✅ Verification", Icon = "check-circle" }),
+    Enemies = Window:AddTab({ Title = "👾 Enemies", Icon = "users" }),
+    RaceSpin = Window:AddTab({ Title = "🎲 Race Spin", Icon = "dice-1" }),
+    AptitudeSpin = Window:AddTab({ Title = "📊 Aptitude", Icon = "bar-chart" }),
+    Stats = Window:AddTab({ Title = "📈 Stats", Icon = "trending-up" }),
+    Debug = Window:AddTab({ Title = "🔧 Debug", Icon = "bug" }),
+    Settings = Window:AddTab({ Title = "⚙️ Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
+-- AUTO FARM TAB
+Tabs.AutoFarm:AddParagraph({ 
+    Title = "⚔️ Enhanced Auto Farm V2.1", 
+    Content = "Auto farm with anti-stop protection, enhanced boss detection, and fixed comparisons!" 
+})
+
+local AutoFarmToggle = Tabs.AutoFarm:AddToggle("AutoFarm", { 
+    Title = "Auto Farm", 
+    Description = "Enable auto farming with anti-stop protection", 
+    Default = false 
+})
+AutoFarmToggle:OnChanged(function()
+    settings.autoFarm = Options.AutoFarm.Value
+    if settings.autoFarm then
+        getgenv().b = true
+        farmState.lastTargetFoundTime = tick()
+        resumeFarming("User enabled enhanced auto farm")
+        if Fluent then
+            Fluent:Notify({ 
+                Title = "⚔️ ENHANCED FARM V2.1 STARTED!", 
+                Content = "Anti-stop protection + boss detection + fixed comparisons active!", 
+                Duration = 3 
+            })
+        end
+    else
+        getgenv().b = false
+        pauseFarming("User disabled auto farm")
+        stopAllAttacks()
+        if Fluent then
+            Fluent:Notify({ 
+                Title = "⚔️ Enhanced Farm Stopped", 
+                Content = "All attacks halted.", 
+                Duration = 3 
+            })
+        end
+    end
+end)
+
+local AttackDelaySlider = Tabs.AutoFarm:AddSlider("AttackDelay", {
+    Title = "Attack Delay",
+    Description = "Delay between light and heavy attacks",
+    Default = 0.1,
+    Min = 0,
+    Max = 1,
+    Rounding = 2
+})
+AttackDelaySlider:OnChanged(function(Value) 
+    settings.attackDelay = Value 
+end)
+
+local PositionOffsetSlider = Tabs.AutoFarm:AddSlider("PositionOffset", {
+    Title = "Position Offset",
+    Description = "Distance from enemy when attacking",
+    Default = 3,
+    Min = 1,
+    Max = 10,
+    Rounding = 1
+})
+PositionOffsetSlider:OnChanged(function(Value) 
+    settings.positionOffset = Value 
+end)
+
+local AttackerValueToggle = Tabs.AutoFarm:AddToggle("UseAttackerValue", { 
+    Title = "Require AttackerValue", 
+    Description = "Only target enemies with AttackerValue", 
+    Default = true 
+})
+AttackerValueToggle:OnChanged(function() 
+    settings.useAttackerValue = Options.UseAttackerValue.Value 
+end)
+
+Tabs.AutoFarm:AddButton({ 
+    Title = "Force Restart Farm", 
+    Description = "Manually restart farm if stuck",
+    Callback = function() 
+        farmState.currentTarget = nil
+        farmState.lastTargetFoundTime = tick()
+        getgenv().b = true
+        stats.farmRestarts = stats.farmRestarts + 1
+        if Fluent then
+            Fluent:Notify({ Title = "🔄 Farm Restarted", Content = "Farm manually restarted", Duration = 2 })
+        end
+    end 
+})
+
+-- GRIP TAB
+Tabs.Grip:AddParagraph({ 
+    Title = "🤲 Enhanced Auto Grip V2.1", 
+    Content = "Auto grip system with enhanced boss detection and fixed comparisons!" 
+})
+
+local AutoGripToggle = Tabs.Grip:AddToggle("AutoGrip", { 
+    Title = "Auto Grip", 
+    Description = "Enable enhanced auto grip system",
+    Default = false 
+})
+AutoGripToggle:OnChanged(function() 
+    settings.autoGrip = Options.AutoGrip.Value 
+    if settings.autoGrip then
+        if Fluent then
+            Fluent:Notify({ 
+                Title = "🤲 ENHANCED GRIP V2.1 ENABLED!", 
+                Content = "Enhanced detection system with fixed comparisons active!", 
+                Duration = 3 
+            })
+        end
+    else
+        gripState.downMobs = {}
+        setGrippingState(false, "Enhanced auto grip disabled")
+        resumeFarming("Auto grip disabled")
+    end 
+end)
+
+local UseHybridGripToggle = Tabs.Grip:AddToggle("UseHybridGrip", { 
+    Title = "Use Hybrid Grip Movement", 
+    Description = "Use teleport + walk for grip positioning", 
+    Default = true 
+})
+UseHybridGripToggle:OnChanged(function() 
+    settings.useHybridGrip = Options.UseHybridGrip.Value 
+end)
+
+local GripDelaySlider = Tabs.Grip:AddSlider("GripDelay", {
+    Title = "Grip Animation Delay",
+    Description = "Delay after grip execution (longer for bosses)",
+    Default = 3,
+    Min = 1,
+    Max = 8,
+    Rounding = 1
+})
+GripDelaySlider:OnChanged(function(Value) 
+    settings.gripDelay = Value 
+end)
+
+local GripStickDistanceSlider = Tabs.Grip:AddSlider("GripStickDistance", {
+    Title = "Grip Stick Distance",
+    Description = "Target distance for grip positioning",
+    Default = 3,
+    Min = 1,
+    Max = 10,
+    Rounding = 1
+})
+GripStickDistanceSlider:OnChanged(function(Value) 
+    settings.gripStickDistance = Value 
+end)
+
+local GripWalkTimeoutSlider = Tabs.Grip:AddSlider("GripWalkTimeout", {
+    Title = "Grip Walk Timeout",
+    Description = "Max time to spend walking to grip position",
+    Default = 3,
+    Min = 1,
+    Max = 10,
+    Rounding = 1
+})
+GripWalkTimeoutSlider:OnChanged(function(Value) 
+    settings.gripWalkTimeout = Value 
+end)
+
+Tabs.Grip:AddButton({ 
+    Title = "Manual Enhanced Grip", 
+    Description = "Execute grip manually with enhanced detection",
+    Callback = function() 
+        manualGrip()
+        if Fluent then
+            Fluent:Notify({ Title = "🤲 Manual Grip", Content = "Enhanced grip executed manually", Duration = 2 })
+        end
+    end 
+})
+
+-- BOSS DETECTION TAB
+Tabs.Detection:AddParagraph({ 
+    Title = "🔍 Boss Down Detection System V2.1", 
+    Content = "Configure advanced down detection for bosses with fixed comparisons!" 
+})
+
+local UseAdvancedDownDetectionToggle = Tabs.Detection:AddToggle("UseAdvancedDownDetection", { 
+    Title = "Use Advanced Down Detection", 
+    Description = "Enable advanced detection methods with safe comparisons", 
+    Default = true 
+})
+UseAdvancedDownDetectionToggle:OnChanged(function() 
+    settings.useAdvancedDownDetection = Options.UseAdvancedDownDetection.Value 
+end)
+
+local BossHealthThresholdSlider = Tabs.Detection:AddSlider("BossHealthThreshold", {
+    Title = "Boss Health Threshold (%)",
+    Description = "Health threshold for boss enemies (0-50%)",
+    Default = 2,
+    Min = 0,
+    Max = 50,
+    Rounding = 1
+})
+BossHealthThresholdSlider:OnChanged(function(Value) 
+    settings.bossHealthThreshold = Value 
+end)
+
+local RegularHealthThresholdSlider = Tabs.Detection:AddSlider("RegularHealthThreshold", {
+    Title = "Regular Enemy Threshold (%)",
+    Description = "Health threshold for regular enemies (0-50%)",
+    Default = 8,
+    Min = 0,
+    Max = 50,
+    Rounding = 1
+})
+RegularHealthThresholdSlider:OnChanged(function(Value) 
+    settings.regularHealthThreshold = Value 
+end)
+
+local HealthRegenDetectionToggle = Tabs.Detection:AddToggle("HealthRegenDetection", { 
+    Title = "Health Regeneration Detection", 
+    Description = "Detect enemies with health regeneration", 
+    Default = true 
+})
+HealthRegenDetectionToggle:OnChanged(function() 
+    settings.healthRegenDetection = Options.HealthRegenDetection.Value 
+end)
+
+local VelocityThresholdSlider = Tabs.Detection:AddSlider("VelocityThreshold", {
+    Title = "Velocity Threshold",
+    Description = "Max velocity to consider enemy 'down'",
+    Default = 3,
+    Min = 1,
+    Max = 20,
+    Rounding = 1
+})
+VelocityThresholdSlider:OnChanged(function(Value) 
+    settings.velocityThreshold = Value 
+end)
+
+local PositionStableTimeSlider = Tabs.Detection:AddSlider("PositionStableTime", {
+    Title = "Position Stable Time",
+    Description = "Seconds position must be stable to detect down",
+    Default = 2,
+    Min = 1,
+    Max = 10,
+    Rounding = 1
+})
+PositionStableTimeSlider:OnChanged(function(Value) 
+    settings.positionStableTime = Value 
+end)
+
+local HealthRegenTimeSlider = Tabs.Detection:AddSlider("HealthRegenTime", {
+    Title = "Health Regen Detection Time",
+    Description = "Time window for health regeneration detection",
+    Default = 3,
+    Min = 1,
+    Max = 10,
+    Rounding = 1
+})
+HealthRegenTimeSlider:OnChanged(function(Value) 
+    settings.healthRegenTime = Value 
+end)
+
+local HealthRegenThresholdSlider = Tabs.Detection:AddSlider("HealthRegenThreshold", {
+    Title = "Health Regen Threshold",
+    Description = "Min health increase to detect regeneration",
+    Default = 3,
+    Min = 1,
+    Max = 20,
+    Rounding = 1
+})
+HealthRegenThresholdSlider:OnChanged(function(Value) 
+    settings.healthRegenThreshold = Value 
+end)
+
+-- ANTI-STOP TAB
+Tabs.AntiStop:AddParagraph({ 
+    Title = "🛡️ Anti-Stop Protection V2.1", 
+    Content = "Prevent auto farm from stopping randomly with enhanced monitoring!" 
+})
+
+local AutoRestartFarmToggle = Tabs.AntiStop:AddToggle("AutoRestartFarm", { 
+    Title = "Auto Restart Farm", 
+    Description = "Automatically restart farm if it stops", 
+    Default = true 
+})
+AutoRestartFarmToggle:OnChanged(function() 
+    settings.autoRestartFarm = Options.AutoRestartFarm.Value 
+end)
+
+local MaxNoTargetTimeSlider = Tabs.AntiStop:AddSlider("MaxNoTargetTime", {
+    Title = "Max No Target Time",
+    Description = "Seconds without target before auto restart",
+    Default = 8,
+    Min = 3,
+    Max = 20,
+    Rounding = 1
+})
+MaxNoTargetTimeSlider:OnChanged(function(Value) 
+    settings.maxNoTargetTime = Value 
+end)
+
+local FarmHealthCheckToggle = Tabs.AntiStop:AddToggle("FarmHealthCheck", { 
+    Title = "Farm Health Check", 
+    Description = "Regularly check farm health and fix issues", 
+    Default = true 
+})
+FarmHealthCheckToggle:OnChanged(function() 
+    settings.farmHealthCheck = Options.FarmHealthCheck.Value 
+end)
+
+local KeepAlivePingSlider = Tabs.AntiStop:AddSlider("KeepAlivePing", {
+    Title = "Keep Alive Ping",
+    Description = "Seconds between keep-alive pings",
+    Default = 2,
+    Min = 1,
+    Max = 10,
+    Rounding = 1
+})
+KeepAlivePingSlider:OnChanged(function(Value) 
+    settings.keepAlivePing = Value 
+end)
+
+Tabs.AntiStop:AddButton({ 
+    Title = "Force Farm Health Check", 
+    Description = "Manually trigger farm health check",
+    Callback = function() 
+        checkFarmHealth()
+        if Fluent then
+            Fluent:Notify({ Title = "🛡️ Health Check", Content = "Farm health check executed", Duration = 2 })
+        end
+    end 
+})
+
+-- VERIFICATION TAB
+Tabs.Verification:AddParagraph({ 
+    Title = "✅ Grip Verification System V2.1", 
+    Content = "Configure grip completion verification with enhanced validation!" 
+})
+
+local WaitForGripCompletionToggle = Tabs.Verification:AddToggle("WaitForGripCompletion", { 
+    Title = "Wait for Grip Completion", 
+    Description = "Wait for grip to complete before finding next target", 
+    Default = true 
+})
+WaitForGripCompletionToggle:OnChanged(function() 
+    settings.waitForGripCompletion = Options.WaitForGripCompletion.Value 
+end)
+
+local RequireGripBeforeNextToggle = Tabs.Verification:AddToggle("RequireGripBeforeNext", { 
+    Title = "Require Grip Before Next", 
+    Description = "Require grip completion before attacking next enemy", 
+    Default = true 
+})
+RequireGripBeforeNextToggle:OnChanged(function() 
+    settings.requireGripBeforeNext = Options.RequireGripBeforeNext.Value 
+end)
+
+local MaxGripWaitTimeSlider = Tabs.Verification:AddSlider("MaxGripWaitTime", {
+    Title = "Max Grip Wait Time",
+    Description = "Maximum seconds to wait for grip completion",
+    Default = 15,
+    Min = 5,
+    Max = 30,
+    Rounding = 1
+})
+MaxGripWaitTimeSlider:OnChanged(function(Value) 
+    settings.maxGripWaitTime = Value 
+end)
+
+local GripVerificationDelaySlider = Tabs.Verification:AddSlider("GripVerificationDelay", {
+    Title = "Grip Verification Delay",
+    Description = "Extra delay after grip completion verification",
+    Default = 2,
+    Min = 0,
+    Max = 10,
+    Rounding = 1
+})
+GripVerificationDelaySlider:OnChanged(function(Value) 
+    settings.gripVerificationDelay = Value 
+end)
+
+local MaxTargetTimeSlider = Tabs.Verification:AddSlider("MaxTargetTime", {
+    Title = "Max Target Time",
+    Description = "Maximum seconds to stay on one target",
+    Default = 15,
+    Min = 5,
+    Max = 60,
+    Rounding = 1
+})
+MaxTargetTimeSlider:OnChanged(function(Value) 
+    settings.maxTargetTime = Value 
+end)
+
+local TargetUpdateFrequencySlider = Tabs.Verification:AddSlider("TargetUpdateFrequency", {
+    Title = "Target Update Frequency",
+    Description = "Seconds between target update checks",
+    Default = 0.5,
+    Min = 0.1,
+    Max = 5,
+    Rounding = 1
+})
+TargetUpdateFrequencySlider:OnChanged(function(Value) 
+    settings.targetUpdateFrequency = Value 
+end)
+
+local AllowTargetSwitchingToggle = Tabs.Verification:AddToggle("AllowTargetSwitching", { 
+    Title = "Allow Target Switching", 
+    Description = "Allow switching targets during combat", 
+    Default = true 
+})
+AllowTargetSwitchingToggle:OnChanged(function() 
+    settings.allowTargetSwitching = Options.AllowTargetSwitching.Value 
+end)
+
+-- ENEMY SELECTION TAB
+Tabs.Enemies:AddParagraph({ 
+    Title = "👾 Enemy Selection V2.1", 
+    Content = "Choose which enemies to target with enhanced detection and boss priority." 
+})
+
+local EnemyMultiDropdown = Tabs.Enemies:AddDropdown("SelectedEnemies", {
+    Title = "Select Enemies",
+    Description = "Choose which enemies to farm (bosses get priority)",
+    Values = allEnemies,
+    Multi = true,
+    Default = {"Assassin", "Luo Wuji", "Liu Mei"}
+})
+EnemyMultiDropdown:OnChanged(function(Value) 
+    settings.selectedEnemies = Value 
+    -- Force target update when enemy selection changes
+    setNewTarget(nil, "Enemy selection changed")
+    if Fluent then
+        Fluent:Notify({ Title = "👾 Enemies Updated", Content = "Target selection updated", Duration = 2 })
+    end
+end)
+
+Tabs.Enemies:AddParagraph({ 
+    Title = "🏆 Boss Enemies", 
+    Content = "These enemies get special priority and enhanced detection:\n• Luo Wuji\n• Liu Mei\n• Qin Chen\n• Enkelados\n• Polybotes\n• Porphyrion\n• Iron Fang\n• Huang Ming\n• Strong Dummy\n• Giant\n• Himoty Filbert" 
+})
+
+-- RACE SPIN TAB
+Tabs.RaceSpin:AddParagraph({ 
+    Title = "🎲 Race Spinning V2.1", 
+    Content = "Automatically spin for your desired race with safe operation." 
+})
+
+local RaceSpinToggle = Tabs.RaceSpin:AddToggle("RaceSpin", { 
+    Title = "Auto Race Spin", 
+    Description = "Enable automatic race spinning",
+    Default = false 
+})
+RaceSpinToggle:OnChanged(function() 
+    settings.raceSpin = Options.RaceSpin.Value 
+    if settings.raceSpin then
+        if Fluent then
+            Fluent:Notify({ Title = "🎲 Race Spin Started", Content = "Target: " .. settings.targetRace, Duration = 3 })
+        end
+    end
+end)
+
+local RaceSpeedSlider = Tabs.RaceSpin:AddSlider("RaceSpeed", {
+    Title = "Race Spin Speed",
+    Description = "Delay between race spins (seconds)",
+    Default = 0.5,
+    Min = 0.1,
+    Max = 3,
+    Rounding = 1
+})
+RaceSpeedSlider:OnChanged(function(Value) 
+    settings.raceSpeed = Value 
+end)
+
+local TargetRaceDropdown = Tabs.RaceSpin:AddDropdown("TargetRace", {
+    Title = "Target Race",
+    Description = "Race to spin for",
+    Values = races,
+    Multi = false,
+    Default = 1
+})
+TargetRaceDropdown:OnChanged(function(Value) 
+    settings.targetRace = Value 
+end)
+
+Tabs.RaceSpin:AddParagraph({ 
+    Title = "📊 Current Race Info", 
+    Content = "Current Race: " .. getCurrentRace() .. "\nTarget Race: " .. settings.targetRace .. "\nSpins Performed: " .. stats.raceSpins 
+})
+
+-- APTITUDE SPIN TAB
+Tabs.AptitudeSpin:AddParagraph({ 
+    Title = "📊 Aptitude Spinning V2.1", 
+    Content = "Automatically spin for your desired aptitude level with safe operation." 
+})
+
+local AptitudeSpinToggle = Tabs.AptitudeSpin:AddToggle("AptitudeSpin", { 
+    Title = "Auto Aptitude Spin", 
+    Description = "Enable automatic aptitude spinning",
+    Default = false 
+})
+AptitudeSpinToggle:OnChanged(function() 
+    settings.aptitudeSpin = Options.AptitudeSpin.Value 
+    if settings.aptitudeSpin then
+        if Fluent then
+            Fluent:Notify({ Title = "📊 Aptitude Spin Started", Content = "Target: " .. settings.targetAptitude, Duration = 3 })
+        end
+    end
+end)
+
+local AptitudeSpeedSlider = Tabs.AptitudeSpin:AddSlider("AptitudeSpeed", {
+    Title = "Aptitude Spin Speed",
+    Description = "Delay between aptitude spins (seconds)",
+    Default = 0.5,
+    Min = 0.1,
+    Max = 3,
+    Rounding = 1
+})
+AptitudeSpeedSlider:OnChanged(function(Value) 
+    settings.aptitudeSpeed = Value 
+end)
+
+local TargetAptitudeDropdown = Tabs.AptitudeSpin:AddDropdown("TargetAptitude", {
+    Title = "Target Aptitude",
+    Description = "Aptitude level to spin for",
+    Values = aptitudes,
+    Multi = false,
+    Default = 1
+})
+TargetAptitudeDropdown:OnChanged(function(Value) 
+    settings.targetAptitude = Value 
+end)
+
+Tabs.AptitudeSpin:AddParagraph({ 
+    Title = "📈 Current Aptitude Info", 
+    Content = "Current Aptitude: " .. getCurrentAptitude() .. "\nTarget Aptitude: " .. settings.targetAptitude .. "\nSpins Performed: " .. stats.aptitudeSpins 
+})
+
+-- STATS TAB
+Tabs.Stats:AddParagraph({ 
+    Title = "📈 Enhanced Detection Statistics V2.1", 
+    Content = "Real-time tracking of enhanced detection system with fixed comparisons!" 
+})
+
+local StatsText = Tabs.Stats:AddParagraph({ 
+    Title = "Current Stats", 
+    Content = "Loading enhanced statistics..." 
+})
+
+Tabs.Stats:AddButton({ 
+    Title = "🔄 Refresh Stats", 
+    Description = "Manually refresh statistics display",
+    Callback = function() 
+        if Fluent then
+            Fluent:Notify({ Title = "📈 Stats Refreshed", Content = "Statistics updated", Duration = 1 })
+        end
+    end 
+})
+
+-- DEBUG TAB
+Tabs.Debug:AddParagraph({ 
+    Title = "🔧 Enhanced Detection Debug V2.1", 
+    Content = "Monitor enhanced detection system health with fixed comparisons" 
+})
+
+local DebugText = Tabs.Debug:AddParagraph({ 
+    Title = "Debug Info", 
+    Content = "Loading debug information..." 
+})
+
+Tabs.Debug:AddButton({ 
+    Title = "🛑 Force Stop All", 
+    Description = "Emergency stop all systems",
+    Callback = function() 
+        settings.autoFarm = false
+        settings.autoGrip = false
+        settings.raceSpin = false
+        settings.aptitudeSpin = false
+        getgenv().b = false
+        stopAllAttacks()
+        setGrippingState(false, "Force stop")
+        setNewTarget(nil, "Force stop")
+        farmState.waitingForGrip = false
+        resumeFarming("Force stop")
+        gripState.downMobs = {}
+        -- Clear detection data
+        downDetectionData.mobPositionHistory = {}
+        downDetectionData.mobHealthHistory = {}
+        downDetectionData.mobVelocityHistory = {}
+        downDetectionData.lastHealthCheck = {}
+        downDetectionData.healthTrend = {}
+        downDetectionData.confirmationTime = {}
+        if Fluent then
+            Fluent:Notify({ Title = "🛑 Emergency Stop", Content = "All systems stopped and reset", Duration = 3 })
+        end
+    end 
+})
+
+Tabs.Debug:AddButton({ 
+    Title = "🔄 Reset All Stats", 
+    Description = "Reset all statistics to zero",
+    Callback = function() 
+        for key, _ in pairs(stats) do
+            stats[key] = 0
+        end
+        if Fluent then
+            Fluent:Notify({ Title = "🔄 Stats Reset", Content = "All statistics reset to zero", Duration = 2 })
+        end
+    end 
+})
+
+Tabs.Debug:AddButton({ 
+    Title = "🧹 Clear Detection Data", 
+    Description = "Clear all mob detection history data",
+    Callback = function() 
+        downDetectionData.mobPositionHistory = {}
+        downDetectionData.mobHealthHistory = {}
+        downDetectionData.mobVelocityHistory = {}
+        downDetectionData.detectionStartTime = {}
+        downDetectionData.lastHealthCheck = {}
+        downDetectionData.healthTrend = {}
+        downDetectionData.confirmationTime = {}
+        gripState.downMobs = {}
+        if Fluent then
+            Fluent:Notify({ Title = "🧹 Data Cleared", Content = "Detection data cleared", Duration = 2 })
+        end
+    end 
+})
+
+Tabs.Debug:AddButton({ 
+    Title = "🔧 Test Comparisons", 
+    Description = "Test safe comparison functions",
+    Callback = function() 
+        local testsPassed = 0
+        local totalTests = 5
+        
+        -- Test safe comparisons
+        if safeCompare(5, 3, ">") then testsPassed = testsPassed + 1 end
+        if safeCompare("5", 3, ">") then testsPassed = testsPassed + 1 end
+        if safeCompare(2, 2, "==") then testsPassed = testsPassed + 1 end
+        if safeCompare("invalid", 5, "<=") then testsPassed = testsPassed + 1 end
+        if not safeCompare(3, 5, ">") then testsPassed = testsPassed + 1 end
+        
+        if Fluent then
+            Fluent:Notify({ 
+                Title = "🔧 Comparison Test", 
+                Content = "Tests passed: " .. testsPassed .. "/" .. totalTests, 
+                Duration = 3 
+            })
+        end
+    end 
+})
+
+-- SAFE STATS AND DEBUG UPDATER
+spawn(function()
+    while true do
+        safeCall(function()
+            -- Update stats
+            local downCount = 0
+            for _, d in pairs(gripState.downMobs) do 
+                downCount = downCount + 1 
+            end
+            
+            local gripSuccessRate = stats.gripAttempts > 0 and math.floor((stats.gripSuccesses/stats.gripAttempts)*100) or 0
+            local timeOnCurrentTarget = farmState.currentTarget and (tick() - farmState.targetStartTime) or 0
+            local gripWaitTime = farmState.waitingForGrip and (tick() - farmState.gripWaitStartTime) or 0
+            local timeSinceLastTarget = farmState.lastTargetFoundTime > 0 and (tick() - farmState.lastTargetFoundTime) or 0
+            
+            local statsContent = string.format(
+                "⚔️ Enhanced Auto Farm V2.1:\nMobs Killed: %d\nTotal Attacks: %d\nSuperior Attacks: %d\nTeleports: %d\nFarm Active: %s\n\n🔍 Boss Detection V2.1:\nBosses Detected: %d\nAdvanced Detections: %d\nHealth Regen Detections: %d\nBoss Threshold: %d%%\nRegular Threshold: %d%%\nType Validation Fixes: %d\nComparison Errors: %d\n\n🛡️ Anti-Stop Protection:\nFarm Restarts: %d\nNo Target Events: %d\nKeep Alive Pings: %d\nTime Since Last Target: %.1fs\n\n🤲 Enhanced Auto Grip V2.1:\nGrips Performed: %d\nGrip Attempts: %d\nSuccess Rate: %d%%\nDown Mobs Detected: %d\nCurrently Down: %d\n\n✅ Grip Verification:\nGrip Waits: %d\nGrip Timeouts: %d\nWaiting for Grip: %s\nGrip Wait Time: %.1fs\nSkips Due to Grip: %d\n\n🔧 System Health V2.1:\nErrors Caught: %d\nRemote Events: %s\nCharacter Valid: %s\nAdvanced Detection: %s\n\n🎲 Spinning:\nRace Spins: %d\nAptitude Spins: %d\n\n📊 Current Status:\nRace: %s\nAptitude: %s\nCurrent Target: %s\nTarget Distance: %.1f",
+                stats.mobsKilled, stats.attacks, stats.superiorAttacks, stats.teleports, (settings.autoFarm and getgenv().b) and "Yes" or "No",
+                stats.bossesDetected, stats.advancedDownDetections, stats.healthRegenDetections, settings.bossHealthThreshold, settings.regularHealthThreshold, stats.typeValidationFixes, stats.comparisonErrors,
+                stats.farmRestarts, stats.noTargetEvents, stats.keepAlivePings, timeSinceLastTarget,
+                stats.grips, stats.gripAttempts, gripSuccessRate, stats.downMobsDetected, downCount,
+                stats.gripWaits, stats.gripTimeouts, farmState.waitingForGrip and "Yes" or "No", gripWaitTime, stats.skipsDueToGrip,
+                stats.errors, remoteEvents and "✅" or "❌", validateCharacter() and "✅" or "❌", settings.useAdvancedDownDetection and "✅" or "❌",
+                stats.raceSpins, stats.aptitudeSpins,
+                getCurrentRace(), getCurrentAptitude(),
+                farmState.currentTarget and farmState.currentTarget.Name or "None",
+                farmState.currentTarget and getDistanceToTarget(farmState.currentTarget) or 0
+            )
+            StatsText:SetDesc(statsContent)
+            
+            -- Update debug info
+            local debugContent = string.format(
+                "🔧 Enhanced Detection System V2.1:\nAuto Attack Active: %s\nFarm Paused: %s\nGripping: %s\nGrip Moving: %s\nWaiting for Grip: %s\nAdvanced Detection: %s\n\n🛡️ Anti-Stop System:\nAuto Restart: %s\nFarm Health Check: %s\nMax No Target Time: %ds\nKeep Alive Ping: %ds\nLast Keep Alive: %.1fs ago\n\n🔍 Detection Settings V2.1:\nBoss Threshold: %d%%\nRegular Threshold: %d%%\nVelocity Threshold: %d\nHealth Regen Detection: %s\nAlive/Dead Check: %s\nPosition Stable Time: %ds\nHealth Regen Time: %ds\n\n🎯 Target Details:\nCurrent Target: %s\nIs Boss: %s\nTime on Target: %.1fs\nLast Target Found: %.1fs ago\nPending Grip Target: %s\nTarget Updates: %d\nTarget Switches: %d\n\n🛡️ Error Protection V2.1:\nTotal Errors: %d\nComparison Errors: %d\nType Validation Fixes: %d\nRemote Events: %s\nCharacter Valid: %s\nServices Loaded: %s\n\n⏱️ Timing:\nLast Grip: %.1fs ago\nLast Farm Check: %.1fs ago\nAttack Delay: %.2fs\nTarget Update Frequency: %.1fs\n\n🤲 Enhanced Grip Settings:\nUse Hybrid: %s\nGrip Delay: %ds\nWalk Timeout: %ds\nStick Distance: %d\nMax Grip Wait: %ds\n\n📋 Detection Queue:\nDown Mobs: %d\nDetection Active: %s\nBoss Priority: Enabled\nFarm Restart Count: %d\nMax Target Time: %ds",
+                getgenv().b and "Yes" or "No",
+                farmState.isPaused and "Yes" or "No",
+                farmState.isGripping and "Yes" or "No",
+                gripState.isGripMoving and "Yes" or "No",
+                farmState.waitingForGrip and "Yes" or "No",
+                settings.useAdvancedDownDetection and "Yes" or "No",
+                settings.autoRestartFarm and "Yes" or "No",
+                settings.farmHealthCheck and "Yes" or "No",
+                settings.maxNoTargetTime,
+                settings.keepAlivePing,
+                tick() - farmState.lastKeepAlive,
+                settings.bossHealthThreshold,
+                settings.regularHealthThreshold,
+                settings.velocityThreshold,
+                settings.healthRegenDetection and "Yes" or "No",
+                settings.downDetectionMethods.aliveDeadCheck and "Yes" or "No",
+                settings.positionStableTime,
+                settings.healthRegenTime,
+                farmState.currentTarget and farmState.currentTarget.Name or "None",
+                farmState.currentTarget and (isBoss[farmState.currentTarget.Name] and "Yes" or "No") or "N/A",
+                timeOnCurrentTarget,
+                timeSinceLastTarget,
+                farmState.pendingGripTarget and farmState.pendingGripTarget.Name or "None",
+                stats.autoUpdates,
+                stats.targetSwitches,
+                stats.errors,
+                stats.comparisonErrors,
+                stats.typeValidationFixes,
+                remoteEvents and "✅" or "❌",
+                validateCharacter() and "✅" or "❌",
+                "✅",
+                tick() - gripState.lastGripTime,
+                tick() - farmState.lastFarmCheck,
+                settings.attackDelay,
+                settings.targetUpdateFrequency,
+                settings.useHybridGrip and "Yes" or "No",
+                settings.gripDelay,
+                settings.gripWalkTimeout,
+                settings.gripStickDistance,
+                settings.maxGripWaitTime,
+                downCount,
+                (downCount > 0 and settings.autoGrip) and "Active" or "Inactive",
+                farmState.farmRestartCount,
+                settings.maxTargetTime
+            )
+            DebugText:SetDesc(debugContent)
+        end)
+        
+        task.wait(1)
+    end
+end)
+
+-- SAFE CHARACTER RESPAWN HANDLING
+player.CharacterAdded:Connect(function(newChar) 
+    safeCall(function()
+        character = newChar
+        humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
+        
+        -- Reset states on respawn
+        setGrippingState(false, "Character respawned")
+        setNewTarget(nil, "Character respawned")
+        farmState.waitingForGrip = false
+        farmState.pendingGripTarget = nil
+        farmState.lastTargetFoundTime = tick()
+        resumeFarming("Character respawned")
+        gripState.downMobs = {}
+        
+        -- Clear detection data
+        downDetectionData.mobPositionHistory = {}
+        downDetectionData.mobHealthHistory = {}
+        downDetectionData.mobVelocityHistory = {}
+        downDetectionData.detectionStartTime = {}
+        downDetectionData.lastHealthCheck = {}
+        downDetectionData.healthTrend = {}
+        downDetectionData.confirmationTime = {}
+        
+        if Fluent then
+            Fluent:Notify({ 
+                Title = "👤 Character Respawned", 
+                Content = "Systems reset and ready!", 
+                Duration = 3 
+            })
+        end
+    end)
+end)
+
+-- SAFE SETUP SAVE/INTERFACE MANAGERS
+if SaveManager and InterfaceManager then
+    safeCall(function()
+        SaveManager:SetLibrary(Fluent)
+        InterfaceManager:SetLibrary(Fluent)
+        SaveManager:IgnoreThemeSettings()
+        SaveManager:SetIgnoreIndexes({})
+        InterfaceManager:SetFolder("MurimCultivation")
+        SaveManager:SetFolder("MurimCultivation/Configs")
+
+        InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+        SaveManager:BuildConfigSection(Tabs.Settings)
+
+        Window:SelectTab(1)
+
+        Fluent:Notify({ 
+            Title = "🔍 ENHANCED BOSS DETECTION V2.1 COMPLETE LOADED!", 
+            Content = "All fixes applied: Anti-stop + Boss detection + Fixed comparisons!", 
+            Duration = 5 
+        })
+
+        SaveManager:LoadAutoloadConfig()
+    end)
+end
+
+print("🎉 Murim Cultivation Enhanced Boss Detection V2.1 COMPLETE - Fully Loaded!")
+print("✅ Fixed all string/number comparison errors")
+print("🔧 Enhanced type validation system active")
+print("🛡️ Anti-stop protection enabled")
+print("🔍 Boss detection system ready")
+print("📈 All statistics tracking enabled")
+print("🎯 Ready to farm with maximum efficiency!")
